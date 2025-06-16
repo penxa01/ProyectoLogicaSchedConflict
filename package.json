@@ -1,0 +1,39 @@
+{
+  "name": "sched_conflict",
+  "version": "1.0.0",
+  "description": "Pagina web de sistema de optimizacion basado en organizacion de tareas y recursos",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/penxa01/ProyectoLogicaSchedConflict.git"
+  },
+  "keywords": [
+    "Tareas",
+    "Recursos",
+    "Web",
+    "IBM",
+    "Cloud"
+  ],
+  "author": "Juan Peña",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/penxa01/ProyectoLogicaSchedConflict/issues"
+  },
+  "homepage": "https://github.com/penxa01/ProyectoLogicaSchedConflict#readme",
+  "dependencies": {
+    "aws-sdk": "^2.1692.0",
+    "axios": "^1.10.0",
+    "cors": "^2.8.5",
+    "csv-parser": "^3.2.0",
+    "express": "^5.1.0",
+    "multer": "^2.0.1",
+    "node-fetch": "^3.3.2",
+    "nodemon": "^3.1.10",
+    "pg": "^8.16.0"
+  }
+}

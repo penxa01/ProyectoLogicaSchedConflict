@@ -1,0 +1,573 @@
+// =============================================================================
+// Frontend Client for IBM Watson ML Task Optimization
+// =============================================================================
+
+class TaskOptimizer {
+    constructor() {
+        this.data = {
+            parameters: null,
+            tasks: null,
+            resources: null,
+            demands: null,
+            precedences: null
+        };
+        this.charts = {};
+        this.initializeEventListeners();
+    }
+
+    // =========================================================================
+    // INITIALIZATION
+    // =========================================================================
+
+    initializeEventListeners() {
+        // File upload listeners
+        document.getElementById('parametersFile').addEventListener('change', (e) => this.handleFileUpload(e, 'parameters'));
+        document.getElementById('tasksFile').addEventListener('change', (e) => this.handleFileUpload(e, 'tasks'));
+        document.getElementById('resourcesFile').addEventListener('change', (e) => this.handleFileUpload(e, 'resources'));
+        document.getElementById('demandsFile').addEventListener('change', (e) => this.handleFileUpload(e, 'demands'));
+        document.getElementById('precedencesFile').addEventListener('change', (e) => this.handleFileUpload(e, 'precedences'));
+
+        // Button listeners
+        document.getElementById('loadDataBtn').addEventListener('click', () => this.loadDataPreview());
+        document.getElementById('optimizeBtn').addEventListener('click', () => this.optimizeWithServer());
+        document.getElementById('clearBtn').addEventListener('click', () => this.clearAll());
+
+        // Add sample data button if it exists
+        const sampleBtn = document.getElementById('sampleDataBtn');
+        if (sampleBtn) {
+            sampleBtn.addEventListener('click', () => this.loadSampleData());
+        }
+
+        // Tab listeners
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+        });
+    }
+
+    // =========================================================================
+    // FILE HANDLING
+    // =========================================================================
+
+    async handleFileUpload(event, dataType) {
+        const file = event.target.files[0];
+        if (file && file.type === 'text/csv') {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch('/upload-csv', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    this.data[dataType] = result.data;
+                    this.updateFileStatus(dataType, file.name, true);
+                    this.checkOptimizationReady();
+                    console.log(`${dataType} data loaded:`, this.data[dataType]);
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
+            } catch (error) {
+                this.showError(`Error loading ${dataType}: ${error.message}`);
+                this.updateFileStatus(dataType, file.name, false);
+            }
+        } else {
+            this.showError('Por favor selecciona un archivo CSV válido');
+        }
+    }
+
+    updateFileStatus(dataType, fileName, success) {
+        const infoElement = document.getElementById(`${dataType}Info`);
+        const uploadGroup = infoElement.closest('.upload-group');
+        
+        if (success) {
+            uploadGroup.classList.add('has-file');
+            infoElement.innerHTML = `<small class="success"><i class="fas fa-check"></i> ${fileName}</small>`;
+        } else {
+            uploadGroup.classList.remove('has-file');
+            infoElement.innerHTML = '<small class="error"><i class="fas fa-times"></i> Error al cargar</small>';
+        }
+    }
+
+    checkOptimizationReady() {
+        const requiredFiles = ['tasks', 'resources', 'demands'];
+        const hasRequiredFiles = requiredFiles.every(type => this.data[type] !== null);
+        
+        document.getElementById('optimizeBtn').disabled = !hasRequiredFiles;
+        document.getElementById('loadDataBtn').disabled = !hasRequiredFiles;
+    }
+
+    // =========================================================================
+    // DATA PREVIEW
+    // =========================================================================
+
+    loadDataPreview() {
+        try {
+            this.populatePreviewTables();
+            document.getElementById('previewSection').style.display = 'block';
+            this.showSuccess('Datos cargados correctamente');
+        } catch (error) {
+            this.showError('Error al cargar vista previa: ' + error.message);
+        }
+    }
+
+    populatePreviewTables() {
+        // Tasks table
+        if (this.data.tasks) {
+            this.populateTable('tasksTable', this.data.tasks, ['id', 'pt', 'smin', 'emax']);
+        }
+
+        // Resources table
+        if (this.data.resources) {
+            this.populateTable('resourcesTable', this.data.resources, ['IDresource', 'capacity']);
+        }
+
+        // Demands table 
+        if (this.data.demands) {
+            this.populateTable('demandsTable', this.data.demands, ['taskId', 'resourceId', 'demand']);
+        }
+
+        // Precedences table
+        if (this.data.precedences) {
+            this.populateTable('precedencesTable', this.data.precedences, ['beforeId', 'afterId']);
+        }
+    }
+
+    populateTable(tableId, data, columns) {
+        const tbody = document.querySelector(`#${tableId} tbody`);
+        tbody.innerHTML = '';
+
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            columns.forEach(col => {
+                const td = document.createElement('td');
+                td.textContent = row[col] || '';
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+    }
+
+    // =========================================================================
+    // OPTIMIZATION
+    // =========================================================================
+
+    async optimizeWithServer(useDemo = false) {
+        this.showLoading(true);
+        
+        try {
+            // Validate required data
+            if (!this.data.tasks || this.data.tasks.length === 0) {
+                throw new Error('No hay datos de tareas cargados');
+            }
+            if (!this.data.resources || this.data.resources.length === 0) {
+                throw new Error('No hay datos de recursos cargados');
+            }
+            if (!this.data.demands || this.data.demands.length === 0) {
+                throw new Error('No hay datos de demandas cargados');
+            }
+
+            console.log('Starting optimization with data:', this.data);
+
+            const endpoint = useDemo ? '/optimize-demo' : '/optimize';
+            
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ data: this.data })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.success) {
+                this.displayResults(result.results);
+                this.showSuccess('Optimización completada exitosamente');
+            } else {
+                throw new Error(result.error || 'Unknown error from server');
+            }
+            
+        } catch (error) {
+            console.error('Optimization error:', error);
+            this.showError('Error en la optimización: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    // =========================================================================
+    // SAMPLE DATA
+    // =========================================================================
+
+    async loadSampleData() {
+        try {
+            const response = await fetch('/sample-data');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const sampleData = await response.json();
+            
+            // Load sample data into the application
+            this.data = sampleData;
+            
+            // Update UI to reflect loaded data
+            this.updateFileStatus('parameters', 'sample_parameters.csv', true);
+            this.updateFileStatus('tasks', 'sample_tasks.csv', true);
+            this.updateFileStatus('resources', 'sample_resources.csv', true);
+            this.updateFileStatus('demands', 'sample_demands.csv', true);
+            this.updateFileStatus('precedences', 'sample_precedences.csv', true);
+            
+            this.checkOptimizationReady();
+            this.showSuccess('Datos de ejemplo cargados correctamente');
+            
+        } catch (error) {
+            this.showError('Error cargando datos de ejemplo: ' + error.message);
+        }
+    }
+
+    // =========================================================================
+    // RESULTS DISPLAY
+    // =========================================================================
+
+    displayResults(results) {
+        try {
+            this.updateSolutionSummary(results.solutionSummary);
+            this.createScheduleTable(results.taskSchedule);
+            this.createGanttChart(results.taskSchedule);
+            this.createResourceChart(results.resourceUsage);
+            
+            document.getElementById('resultsSection').style.display = 'block';
+            
+        } catch (error) {
+            this.showError('Error al mostrar resultados: ' + error.message);
+        }
+    }
+
+    updateSolutionSummary(solutionData) {
+        if (solutionData && solutionData.length > 0) {
+            const solution = solutionData[0];
+            document.getElementById('makespanValue').textContent = solution.Makespan || '--';
+            document.getElementById('totalTasksValue').textContent = solution.TotalTasks || '--';
+            document.getElementById('totalResourcesValue').textContent = solution.TotalResources || '--';
+            document.getElementById('statusValue').textContent = solution.Status || '--';
+        }
+    }
+
+    createScheduleTable(scheduleData) {
+        const tbody = document.querySelector('#scheduleTable tbody');
+        tbody.innerHTML = '';
+
+        scheduleData.forEach(task => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>Tarea ${task.TaskID}</td>
+                <td>${task.StartTime}</td>
+                <td>${task.EndTime}</td>
+                <td>${task.Duration}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    createGanttChart(scheduleData) {
+        const ctx = document.getElementById('ganttChart').getContext('2d');
+        
+        // Destroy existing chart
+        if (this.charts.gantt) {
+            this.charts.gantt.destroy();
+        }
+
+        this.charts.gantt = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: scheduleData.map(task => `Tarea ${task.TaskID}`),
+                datasets: [{
+                    label: 'Duración',
+                    data: scheduleData.map(task => ({
+                        x: task.StartTime,
+                        y: `Tarea ${task.TaskID}`,
+                        width: task.Duration
+                    })),
+                    backgroundColor: scheduleData.map((_, index) => this.getTaskColor(index)),
+                    borderColor: scheduleData.map((_, index) => this.getTaskColor(index)),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Diagrama de Gantt - Programación de Tareas'
+                    },
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Tiempo'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    createResourceChart(resourceData) {
+        const ctx = document.getElementById('resourceChart').getContext('2d');
+        
+        // Destroy existing chart
+        if (this.charts.resource) {
+            this.charts.resource.destroy();
+        }
+
+        const labels = resourceData.map(r => `Recurso ${r.ResourceID}`);
+        const capacityData = resourceData.map(r => r.Capacity);
+        const usageData = resourceData.map(r => r.MaxUsage);
+
+        this.charts.resource = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Capacidad',
+                        data: capacityData,
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Uso Máximo',
+                        data: usageData,
+                        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Utilización de Recursos'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Cantidad'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // =========================================================================
+    // UTILITY FUNCTIONS
+    // =========================================================================
+
+    getTaskColor(index) {
+        const colors = [
+            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+            '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+        ];
+        return colors[index % colors.length];
+    }
+
+    switchTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+        // Update tab panes
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.classList.remove('active');
+        });
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+    }
+
+    showLoading(show) {
+        document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+    }
+
+    showSuccess(message) {
+        console.log('Success:', message);
+        // Simple toast notification
+        this.showToast(message, 'success');
+    }
+
+    showError(message) {
+        console.error('Error:', message);
+        // Simple toast notification
+        this.showToast(message, 'error');
+    }
+
+    showToast(message, type = 'info') {
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            font-weight: 500;
+            z-index: 10000;
+            max-width: 300px;
+            word-wrap: break-word;
+            transition: all 0.3s ease;
+        `;
+
+        // Set background color based on type
+        if (type === 'success') {
+            toast.style.backgroundColor = '#10b981';
+        } else if (type === 'error') {
+            toast.style.backgroundColor = '#ef4444';
+        } else {
+            toast.style.backgroundColor = '#6b7280';
+        }
+
+        toast.textContent = message;
+
+        // Add to DOM
+        document.body.appendChild(toast);
+
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, 5000);
+
+        // Allow manual close on click
+        toast.addEventListener('click', () => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        });
+    }
+
+    clearAll() {
+        // Clear file inputs
+        document.querySelectorAll('.file-input').forEach(input => {
+            input.value = '';
+        });
+
+        // Clear data
+        Object.keys(this.data).forEach(key => {
+            this.data[key] = null;
+        });
+
+        // Reset file status
+        document.querySelectorAll('.upload-group').forEach(group => {
+            group.classList.remove('has-file');
+        });
+
+        // Reset info elements
+        document.getElementById('parametersInfo').innerHTML = '<small>Formato: Parameter, Value</small>';
+        document.getElementById('tasksInfo').innerHTML = '<small>Formato: id, pt, smin, emax</small>';
+        document.getElementById('resourcesInfo').innerHTML = '<small>Formato: IDresource, capacity</small>';
+        document.getElementById('demandsInfo').innerHTML = '<small>Formato: taskId, resourceId, demand</small>';
+        document.getElementById('precedencesInfo').innerHTML = '<small>Formato: beforeId, afterId</small>';
+
+        // Hide sections
+        document.getElementById('previewSection').style.display = 'none';
+        document.getElementById('resultsSection').style.display = 'none';
+
+        // Disable buttons
+        document.getElementById('optimizeBtn').disabled = true;
+        document.getElementById('loadDataBtn').disabled = true;
+
+        // Destroy charts
+        Object.values(this.charts).forEach(chart => {
+            if (chart) chart.destroy();
+        });
+        this.charts = {};
+
+        this.showSuccess('Datos limpiados');
+    }
+
+    // =========================================================================
+    // DEMO FUNCTIONS
+    // =========================================================================
+
+    async optimizeDemo() {
+        return this.optimizeWithServer(true);
+    }
+}
+
+// =========================================================================
+// INITIALIZE APPLICATION
+// =========================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.taskOptimizer = new TaskOptimizer();
+    
+    // Add demo button functionality if needed
+    const addDemoButton = () => {
+        const actionButtons = document.querySelector('.action-buttons');
+        if (actionButtons && !document.getElementById('demoBtn')) {
+            const demoBtn = document.createElement('button');
+            demoBtn.id = 'demoBtn';
+            demoBtn.className = 'btn btn-secondary';
+            demoBtn.innerHTML = '<i class="fas fa-play"></i> Demo';
+            demoBtn.addEventListener('click', () => window.taskOptimizer.optimizeDemo());
+            actionButtons.appendChild(demoBtn);
+        }
+    };
+    
+    // Add demo button after a short delay to ensure DOM is ready
+    setTimeout(addDemoButton, 100);
+});
+
+
+
+Analiza este proyecto, ahora el flujo de trabajo es el siguiente, yo puedo subir los archivos con los datos o armar las tablas de forma manual en el csv, cuando toco optimizar, los archivos se suben al IBM COS y luego se ejecutara un JOB con id de despliegue: f2f56eef-31dd-4efe-aa7a-25d1011c0860 ,  id de trabajo: af8c7532-a4cb-46a9-abda-97a19b4b5b9b ,  ENTRADAS DEL JOB:cloud-object-storage-cos-proyfinal-2f2.parameters.csv (Cloud Object Storage-CursoUNSJ)
+
+cloud-object-storage-cos-proyfinal-2f2.Precedences.csv (Cloud Object Storage-CursoUNSJ)
+
+cloud-object-storage-cos-proyfinal-2f2.Tasks.csv (Cloud Object Storage-CursoUNSJ)
+
+cloud-object-storage-cos-proyfinal-2f2.TupleCapacity.csv (Cloud Object Storage-CursoUNSJ)
+
+cloud-object-storage-cos-proyfinal-2f2.TaskResourceDemand.csv (Cloud Object Storage-CursoUNSJ)
+
+Problemas: Cuando armo las tblas manuales, el boton de optimizar no me deja pulsarlo, ademas hay que añadir la logica para que cuando pulse el boton optimizar, primero suba los archivos dependiendo si son parseados de los manuales, o directamente de los subidos, y despues de ello ejecutar el job con los correspondientes archivos y luego, traer las salidas del job, SALIDAS : cloud-object-storage-cos-proyfinal-2f2.stats.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.ResourceUsageResults.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.TaskScheduleOutput.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.ResourceTimelineOutput.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.SolutionResults.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.skip.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.TaskResourceUsageOutput.csv (Cloud Object Storage-CursoUNSJ)
+
+Y mostrarlos en los graficos

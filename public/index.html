@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimización de Tareas - IBM Watson ML</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* ===== ESTILOS CSS EMBEBIDOS ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header-content h1 {
+            color: white;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-content p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            overflow: hidden;
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 1.5rem;
+        }
+
+        .card-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .card-body {
+            padding: 2rem;
+        }
+
+        /* Input Mode Tabs */
+        .input-mode-tabs {
+            display: flex;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-mode-tab {
+            flex: 1;
+            padding: 1rem;
+            border: none;
+            background: #f8f9fa;
+            color: #6c757d;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .input-mode-tab.active {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+        }
+
+        .input-mode-tab:hover:not(.active) {
+            background: #e9ecef;
+        }
+
+        .upload-area {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .upload-group {
+            border: 2px dashed #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: #f9fafb;
+        }
+
+        .upload-group:hover {
+            border-color: #4f46e5;
+            background: #f0f0ff;
+        }
+
+        .upload-group.has-file {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .upload-label {
+            display: block;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+        }
+
+        .upload-label i {
+            margin-right: 0.5rem;
+            color: #4f46e5;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-info {
+            color: #6b7280;
+            font-size: 0.8rem;
+        }
+
+        /* Manual Input Styles */
+        .manual-input-section {
+            display: none;
+        }
+
+        .manual-input-section.active {
+            display: block;
+        }
+
+        .input-groups {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .input-group {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            background: #f9fafb;
+        }
+
+        .input-group h3 {
+            color: #374151;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .input-group h3 i {
+            color: #4f46e5;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) auto;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            align-items: center;
+        }
+
+        .form-input {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        .add-row-btn {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            transition: background 0.3s;
+        }
+
+        .add-row-btn:hover {
+            background: #3730a3;
+        }
+
+        .remove-row-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .remove-row-btn:hover {
+            background: #dc2626;
+        }
+
+        .row-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .tabs {
+            margin-top: 1rem;
+        }
+
+        .tab-buttons {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-weight: 500;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: #4f46e5;
+            border-bottom-color: #4f46e5;
+        }
+
+        .tab-button:hover {
+            color: #4f46e5;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        .data-table th {
+            background: #f9fafb;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .data-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .data-table tbody tr:hover {
+            background: #f9fafb;
+        }
+
+        .solution-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-item {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #0ea5e9;
+        }
+
+        .summary-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #0369a1;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-label {
+            font-size: 0.9rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-wrapper {
+            background: #f9fafb;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .chart-wrapper h3 {
+            margin-bottom: 1rem;
+            color: #374151;
+            text-align: center;
+        }
+
+        .chart-wrapper canvas {
+            max-height: 300px;
+        }
+
+        .detailed-results {
+            margin-top: 2rem;
+        }
+
+        .detailed-results h3 {
+            margin-bottom: 1rem;
+            color: #374151;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 2rem;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success {
+            color: #10b981;
+        }
+
+        .error {
+            color: #ef4444;
+        }
+
+        .warning {
+            color: #f59e0b;
+        }
+
+        /* Validation Errors Styles */
+        .validation-errors {
+            background: #fef2f2;
+            border: 1px solid #f87171;
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: #dc2626;
+        }
+
+        .validation-errors h4 {
+            margin: 0 0 0.5rem 0;
+        }
+
+        .validation-errors ul {
+            margin: 0;
+            padding-left: 1.5rem;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mb-1 { margin-bottom: 0.5rem; }
+        .mb-2 { margin-bottom: 1rem; }
+        .mb-3 { margin-bottom: 1.5rem; }
+
+        .mt-1 { margin-top: 0.5rem; }
+        .mt-2 { margin-top: 1rem; }
+        .mt-3 { margin-top: 1.5rem; }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header-content h1 {
+                font-size: 2rem;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .upload-area, .input-groups {
+                grid-template-columns: 1fr;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .tab-buttons {
+                justify-content: center;
+            }
+
+            .tab-button {
+                flex: 1;
+                min-width: 80px;
+                font-size: 0.9rem;
+            }
+
+            .solution-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-wrapper {
+                min-width: unset;
+            }
+
+            .input-mode-tabs {
+                flex-direction: column;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header-content h1 {
+                font-size: 1.8rem;
+            }
+
+            .header-content p {
+                font-size: 1rem;
+            }
+
+            .solution-summary {
+                grid-template-columns: 1fr;
+            }
+
+            .tab-button {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.8rem;
+            }
+
+            .summary-value {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-project-diagram"></i> Optimización de Tareas</h1>
+                <p>Sistema de programación de tareas con recursos utilizando IBM Watson Machine Learning</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Input Section -->
+            <section class="input-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-upload"></i> Entrada de Datos</h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- Input Mode Selection -->
+                        <div class="input-mode-tabs">
+                            <button class="input-mode-tab active" data-mode="csv">
+                                <i class="fas fa-file-csv"></i>
+                                Cargar Archivos CSV
+                            </button>
+                            <button class="input-mode-tab" data-mode="manual">
+                                <i class="fas fa-keyboard"></i>
+                                Entrada Manual
+                            </button>
+                        </div>
+
+                        <!-- CSV Upload Section -->
+                        <div id="csv-input-section" class="csv-input-section">
+                            <!-- File Upload Area -->
+                            <div class="upload-area">
+                                <div class="upload-group">
+                                    <label class="upload-label" for="parametersFile">
+                                        <i class="fas fa-cog"></i> Parámetros del Modelo
+                                    </label>
+                                    <input type="file" id="parametersFile" accept=".csv" class="file-input">
+                                    <div class="file-info" id="parametersInfo">
+                                        <small>Formato: Parameter, Value</small>
+                                    </div>
+                                </div>
+
+                                <div class="upload-group">
+                                    <label class="upload-label" for="tasksFile">
+                                        <i class="fas fa-tasks"></i> Tareas
+                                    </label>
+                                    <input type="file" id="tasksFile" accept=".csv" class="file-input">
+                                    <div class="file-info" id="tasksInfo">
+                                        <small>Formato: id, pt, smin, emax</small>
+                                    </div>
+                                </div>
+
+                                <div class="upload-group">
+                                    <label class="upload-label" for="resourcesFile">
+                                        <i class="fas fa-cube"></i> Recursos
+                                    </label>
+                                    <input type="file" id="resourcesFile" accept=".csv" class="file-input">
+                                    <div class="file-info" id="resourcesInfo">
+                                        <small>Formato: IDresource, capacity</small>
+                                    </div>
+                                </div>
+
+                                <div class="upload-group">
+                                    <label class="upload-label" for="demandsFile">
+                                        <i class="fas fa-chart-bar"></i> Demandas de Recursos
+                                    </label>
+                                    <input type="file" id="demandsFile" accept=".csv" class="file-input">
+                                    <div class="file-info" id="demandsInfo">
+                                        <small>Formato: taskId, resourceId, demand</small>
+                                    </div>
+                                </div>
+
+                                <div class="upload-group">
+                                    <label class="upload-label" for="precedencesFile">
+                                        <i class="fas fa-sitemap"></i> Precedencias
+                                    </label>
+                                    <input type="file" id="precedencesFile" accept=".csv" class="file-input">
+                                    <div class="file-info" id="precedencesInfo">
+                                        <small>Formato: beforeId, afterId</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Manual Input Section -->
+                        <div id="manual-input-section" class="manual-input-section">
+                            <div class="input-groups">
+                                <!-- Tasks Input -->
+                                <div class="input-group">
+                                    <h3><i class="fas fa-tasks"></i> Tareas</h3>
+                                    <div id="tasks-container">
+                                        <div class="form-row">
+                                            <input type="number" class="form-input" placeholder="ID" name="task-id" min="1">
+                                            <input type="number" class="form-input" placeholder="Duración (pt)" name="task-pt" min="1">
+                                            <input type="number" class="form-input" placeholder="Inicio Mín" name="task-smin" value="0" min="0">
+                                            <input type="number" class="form-input" placeholder="Fin Máx" name="task-emax" value="999" min="1">
+                                            <div class="row-controls">
+                                                <button type="button" class="remove-row-btn" onclick="removeRow(this)">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="add-row-btn" onclick="addTaskRow()">
+                                        <i class="fas fa-plus"></i> Agregar Tarea
+                                    </button>
+                                </div>
+
+                                <!-- Resources Input -->
+                                <div class="input-group">
+                                    <h3><i class="fas fa-cube"></i> Recursos</h3>
+                                    <div id="resources-container">
+                                        <div class="form-row">
+                                            <input type="number" class="form-input" placeholder="ID Recurso" name="resource-id" min="0">
+                                            <input type="number" class="form-input" placeholder="Capacidad" name="resource-capacity" min="1">
+                                            <div class="row-controls">
+                                                <button type="button" class="remove-row-btn" onclick="removeRow(this)">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="add-row-btn" onclick="addResourceRow()">
+                                        <i class="fas fa-plus"></i> Agregar Recurso
+                                    </button>
+                                </div>
+
+                                <!-- Demands Input -->
+                                <div class="input-group">
+                                    <h3><i class="fas fa-chart-bar"></i> Demandas de Recursos</h3>
+                                    <div id="demands-container">
+                                        <div class="form-row">
+                                            <input type="number" class="form-input" placeholder="ID Tarea" name="demand-taskid" min="1">
+                                            <input type="number" class="form-input" placeholder="ID Recurso" name="demand-resourceid" min="0">
+                                            <input type="number" class="form-input" placeholder="Demanda" name="demand-demand" min="1">
+                                            <div class="row-controls">
+                                                <button type="button" class="remove-row-btn" onclick="removeRow(this)">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="add-row-btn" onclick="addDemandRow()">
+                                        <i class="fas fa-plus"></i> Agregar Demanda
+                                    </button>
+                                </div>
+
+                                <!-- Precedences Input -->
+                                <div class="input-group">
+                                    <h3><i class="fas fa-sitemap"></i> Precedencias</h3>
+                                    <div id="precedences-container">
+                                        <div class="form-row">
+                                            <input type="number" class="form-input" placeholder="Tarea Anterior" name="precedence-before" min="1">
+                                            <input type="number" class="form-input" placeholder="Tarea Posterior" name="precedence-after" min="1">
+                                            <div class="row-controls">
+                                                <button type="button" class="remove-row-btn" onclick="removeRow(this)">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="add-row-btn" onclick="addPrecedenceRow()">
+                                        <i class="fas fa-plus"></i> Agregar Precedencia
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="action-buttons">
+                            <button id="sampleDataBtn" class="btn btn-secondary">
+                                <i class="fas fa-database"></i> Cargar Datos de Ejemplo
+                            </button>
+                            <button id="loadDataBtn" class="btn btn-secondary" disabled>
+                                <i class="fas fa-eye"></i> Visualizar Datos
+                            </button>
+                            <button id="optimizeBtn" class="btn btn-primary" disabled>
+                                <i class="fas fa-rocket"></i> Optimizar
+                            </button>
+                            <button id="clearBtn" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Limpiar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Preview Section -->
+            <section class="preview-section" id="previewSection" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-table"></i> Vista Previa de Datos</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="tabs">
+                            <div class="tab-buttons">
+                                <button class="tab-button active" data-tab="tasks">Tareas</button>
+                                <button class="tab-button" data-tab="resources">Recursos</button>
+                                <button class="tab-button" data-tab="demands">Demandas</button>
+                                <button class="tab-button" data-tab="precedences">Precedencias</button>
+                            </div>
+                            <div class="tab-content">
+                                <div class="tab-pane active" id="tasks-tab">
+                                    <div class="table-container">
+                                        <table id="tasksTable" class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Duración (pt)</th>
+                                                    <th>Inicio Mín (smin)</th>
+                                                    <th>Fin Máx (emax)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="tab-pane" id="resources-tab">
+                                    <div class="table-container">
+                                        <table id="resourcesTable" class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID Recurso</th>
+                                                    <th>Capacidad</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="tab-pane" id="demands-tab">
+                                    <div class="table-container">
+                                        <table id="demandsTable" class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID Tarea</th>
+                                                    <th>ID Recurso</th>
+                                                    <th>Demanda</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="tab-pane" id="precedences-tab">
+                                    <div class="table-container">
+                                        <table id="precedencesTable" class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Tarea Anterior</th>
+                                                    <th>Tarea Posterior</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-chart-line"></i> Resultados de Optimización</h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- Solution Summary -->
+                        <div class="solution-summary" id="solutionSummary">
+                            <div class="summary-item">
+                                <div class="summary-value" id="makespanValue">--</div>
+                                <div class="summary-label">Makespan</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value" id="totalTasksValue">--</div>
+                                <div class="summary-label">Total Tareas</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value" id="totalResourcesValue">--</div>
+                                <div class="summary-label">Total Recursos</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value" id="statusValue">--</div>
+                                <div class="summary-label">Estado</div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Container -->
+                        <div class="charts-container">
+                            <div class="chart-wrapper">
+                                <h3>Diagrama de Gantt</h3>
+                                <canvas id="ganttChart"></canvas>
+                            </div>
+                            <div class="chart-wrapper">
+                                <h3>Utilización de Recursos</h3>
+                                <canvas id="resourceChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Detailed Results -->
+                        <div class="detailed-results">
+                            <h3>Programación Detallada</h3>
+                            <div class="table-container">
+                                <table id="scheduleTable" class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Tarea</th>
+                                            <th>Inicio</th>
+                                            <th>Fin</th>
+                                            <th>Duración</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>Optimizando con IBM Watson ML...</p>
+                <small>Esto puede tomar varios minutos</small>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 Proyecto Académico - Optimización de Tareas con IBM Watson ML</p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
