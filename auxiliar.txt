@@ -571,3 +571,17 @@ cloud-object-storage-cos-proyfinal-2f2.TaskResourceDemand.csv (Cloud Object Stor
 Problemas: Cuando armo las tblas manuales, el boton de optimizar no me deja pulsarlo, ademas hay que añadir la logica para que cuando pulse el boton optimizar, primero suba los archivos dependiendo si son parseados de los manuales, o directamente de los subidos, y despues de ello ejecutar el job con los correspondientes archivos y luego, traer las salidas del job, SALIDAS : cloud-object-storage-cos-proyfinal-2f2.stats.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.ResourceUsageResults.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.TaskScheduleOutput.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.ResourceTimelineOutput.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.SolutionResults.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.skip.csv (Cloud Object Storage-CursoUNSJ), cloud-object-storage-cos-proyfinal-2f2.TaskResourceUsageOutput.csv (Cloud Object Storage-CursoUNSJ)
 
 Y mostrarlos en los graficos
+
+NO PERDER
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE
+7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE

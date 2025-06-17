@@ -1,5 +1,5 @@
 // =============================================================================
-// Node.js Server with IBM Cloud Object Storage Integration - MODIFICADO
+// Node.js Server with IBM Cloud Object Storage Integration - CORREGIDO
 // =============================================================================
 
 const express = require('express');
@@ -34,10 +34,9 @@ const COS_CONFIG = {
 // =============================================================================
 
 const IBM_CONFIG = {
-    apiKey: 'C3g5p6YQe8rCH9xztTduzstOPz1CVT64fox7Gi5j7xLi',
+    apiKey: '7m47Gixb23qgvhj8qOAeO4cYYBP-_0zfSUX-hvfjHmCE',
     jobId: 'af8c7532-a4cb-46a9-abda-97a19b4b5b9b', // Tu Job ID existente
-    spaceId: 'dd18eb10-08af-4997-afd8-e23ea057ff93', // Tu Space ID
-    groupId: 'b6b35acd-fc65-4966-be66-98499d334c4c', // Tu Group ID
+    spaceId: 'b6b35acd-fc65-4966-be66-98499d334c4c', // Tu Space ID
     // Endpoint para ejecutar job existente
     jobRunEndpoint: 'https://api.dataplatform.cloud.ibm.com/v2/jobs/af8c7532-a4cb-46a9-abda-97a19b4b5b9b/runs?space_id=dd18eb10-08af-4997-afd8-e23ea057ff93',
     // Endpoint para consultar status del run
@@ -244,7 +243,7 @@ function generateOptimizationCSVs(data) {
 }
 
 // =============================================================================
-// IBM Watson ML Helper Functions - MODIFICADAS PARA EJECUTAR JOB EXISTENTE
+// IBM Watson ML Helper Functions - CORREGIDAS PARA EJECUTAR JOB EXISTENTE
 // =============================================================================
 
 async function getAccessToken() {
@@ -319,7 +318,7 @@ async function getAccessToken() {
     }
 }
 
-// NUEVA FUNCIÓN: Ejecutar job existente en lugar de crear uno nuevo
+// FUNCIÓN CORREGIDA: Ejecutar job existente con manejo de permisos mejorado
 async function executeExistingJob() {
     try {
         console.log('🚀 Executing existing Watson ML job...');
@@ -328,86 +327,226 @@ async function executeExistingJob() {
         
         const accessToken = await getAccessToken();
         
-        // Payload para ejecutar el job existente
-        const payload = {
-            // Configuración para usar archivos de entrada desde COS
-            job_input_data_references: [
-                {
-                    type: "connection_asset",
-                    connection: {
-                        id: "coss_connection"
-                    },
-                    location: {
-                        bucket: COS_CONFIG.bucketName,
-                        path: ""
-                    }
-                }
-            ],
-            // Configuración para guardar resultados en COS
-            job_output_data_references: [
-                {
-                    type: "connection_asset", 
-                    connection: {
-                        id: "coss_connection"
-                    },
-                    location: {
-                        bucket: COS_CONFIG.bucketName,
-                        path: "output/"
-                    }
-                }
-            ]
-        };
+        // Verificar permisos del space primero
+        try {
+            await verifySpaceAccess(accessToken);
+        } catch (permError) {
+            if (permError.message.includes('not authorized')) {
+                console.error('🚫 CRITICAL: ServiceId not authorized for space');
+                console.error('🔧 REQUIRED ACTION: Add ServiceId as collaborator in Watson Studio');
+                console.error('   📍 Go to: https://dataplatform.cloud.ibm.com/projects/' + IBM_CONFIG.spaceId);
+                console.error('   🔹 Navigate: Manage → Access control → Add collaborators');
+                console.error('   🔹 Role: Editor or Admin');
+                throw permError;
+            }
+        }
+        
+        // Payload mínimo - no incluir parámetros que puedan causar problemas de permisos
+        const payload = {};
 
         console.log('📤 Sending job execution request...');
         console.log('🔗 Endpoint:', IBM_CONFIG.jobRunEndpoint);
 
-        // Enviar POST con body vacío (null) para ejecutar el job existente
-        const response = await axios.post(IBM_CONFIG.jobRunEndpoint, {}, {
+        // Enviar POST para ejecutar el job existente
+        const response = await axios.post(IBM_CONFIG.jobRunEndpoint, payload, {
             headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
-            }
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+                'X-Watson-User-Agent': 'optimization-app/1.0'
+            },
+            timeout: 60000
         });
 
         console.log('✅ Job execution started successfully');
         console.log('📊 Response data:', response.data);
         
         return response.data;
+        
     } catch (error) {
         console.error('❌ Error executing job:', error.response?.data || error.message);
         console.error('📊 Response status:', error.response?.status);
-        console.error('📊 Response headers:', error.response?.headers);
-        throw new Error(`Job execution failed: ${error.response?.status || 'Unknown'} - ${error.response?.data?.message || error.message}`);
+        
+        // Manejo específico de errores de permisos
+        if (error.response?.status === 403) {
+            const errorDetails = error.response?.data;
+            console.error('🚫 PERMISSION ERROR DETAILS:');
+            console.error('   Code:', errorDetails?.code);
+            console.error('   Reason:', errorDetails?.reason);
+            console.error('   Message:', errorDetails?.message);
+            
+            // Extraer ServiceId del error si está disponible
+            const serviceIdMatch = errorDetails?.reason?.match(/ServiceId-[a-f0-9\-]+/);
+            const serviceId = serviceIdMatch ? serviceIdMatch[0] : 'Unknown';
+            
+            console.error('🆔 ServiceId:', serviceId);
+            console.error('🌐 Space ID:', IBM_CONFIG.spaceId);
+            
+            throw new Error(`PERMISSION DENIED: ServiceId '${serviceId}' not authorized for space '${IBM_CONFIG.spaceId}'. Please add the ServiceId as a collaborator with Editor role in Watson Studio.`);
+        }
+        
+        throw new Error(`Job execution failed: ${error.response?.status || 'Unknown'} - ${error.response?.data?.message || error.response?.data?.error || error.message}`);
     }
+}
+
+// FUNCIÓN AUXILIAR: Verificar acceso al space
+async function verifySpaceAccess(accessToken) {
+    try {
+        console.log('🔍 Verifying space access...');
+        
+        const spaceInfoUrl = `https://api.dataplatform.cloud.ibm.com/v2/spaces/${IBM_CONFIG.spaceId}`;
+        
+        const response = await axios.get(spaceInfoUrl, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            },
+            timeout: 30000
+        });
+        
+        console.log('✅ Space access verified successfully');
+        console.log('📋 Space info:', {
+            id: response.data.metadata?.id,
+            name: response.data.entity?.name,
+            status: response.data.entity?.status?.state
+        });
+        
+        return true;
+        
+    } catch (error) {
+        if (error.response?.status === 403) {
+            throw new Error('ServiceId not authorized for space');
+        }
+        console.warn('⚠️ Could not verify space access, but continuing...');
+        return false;
+    }
+}
+
+// FUNCIÓN AUXILIAR: Extraer ServiceId del error
+function extractServiceIdFromError(error) {
+    try {
+        const errorMessage = error.response?.data?.reason || error.response?.data?.message || '';
+        const serviceIdMatch = errorMessage.match(/ServiceId-[a-f0-9\-]+/);
+        return serviceIdMatch ? serviceIdMatch[0] : 'Not found in error message';
+    } catch (e) {
+        return 'Could not extract ServiceId';
+    }
+}
+
+// FUNCIÓN ALTERNATIVA: Ejecutar usando endpoint directo de Watson ML
+async function executeJobWithWatsonML() {
+    try {
+        console.log('🎯 Attempting execution via Watson ML endpoint...');
+        
+        const accessToken = await getAccessToken();
+        
+        // Usar el endpoint de Watson ML en lugar del de DataPlatform
+        const watsonMLEndpoint = `https://us-south.ml.cloud.ibm.com/ml/v4/jobs/${IBM_CONFIG.jobId}/runs?version=2020-08-01`;
+        
+        const payload = {
+            space_id: IBM_CONFIG.spaceId,
+            job_id: IBM_CONFIG.jobId
+        };
+        
+        console.log('📤 Sending Watson ML job execution request...');
+        console.log('🔗 Endpoint:', watsonMLEndpoint);
+        
+        const response = await axios.post(watsonMLEndpoint, payload, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            },
+            timeout: 60000
+        });
+        
+        console.log('✅ Watson ML job execution started successfully');
+        return response.data;
+        
+    } catch (error) {
+        console.error('❌ Watson ML execution failed:', error.response?.data || error.message);
+        throw error;
+    }
+}
+
+// FUNCIÓN AUXILIAR: Intentar múltiples métodos de ejecución
+async function executeJobWithFallbacks() {
+    const methods = [
+        { name: 'DataPlatform API', func: executeExistingJob },
+        { name: 'Watson ML API', func: executeJobWithWatsonML }
+    ];
+    
+    let lastError = null;
+    
+    for (const method of methods) {
+        try {
+            console.log(`🔄 Trying method: ${method.name}`);
+            const result = await method.func();
+            console.log(`✅ Success with method: ${method.name}`);
+            return result;
+        } catch (error) {
+            console.log(`❌ Method ${method.name} failed:`, error.message);
+            lastError = error;
+            
+            // Si es un error 403, no intentar otros métodos
+            if (error.response?.status === 403) {
+                throw error;
+            }
+        }
+    }
+    
+    // Si todos los métodos fallan, lanzar el último error
+    throw lastError;
 }
 
 // FUNCIÓN MODIFICADA: Polling del estado del job run usando runtime_job_id
 async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 10000) {
     try {
-        // Extraer runtime_job_id o usar el ID del metadata como fallback
-        const runtimeJobId = jobRunResponse.runtimeJobId || jobRunResponse.entity?.job_run?.runtime_job_id;
-        const runId = jobRunResponse.metadata?.id || runtimeJobId;
-        const statusUrl = jobRunResponse.statusUrl || jobRunResponse.href;
+        console.log('\n🔄 STARTING JOB POLLING');
+        console.log('=' .repeat(50));
         
-        console.log(`🔄 Polling job run results...`);
-        console.log(`📋 Runtime Job ID: ${runtimeJobId}`);
-        console.log(`📋 Run ID: ${runId}`);
-        console.log(`📋 Status URL: ${statusUrl}`);
+        // Extraer información del job run response con mejor logging
+        console.log('📋 Raw job run response:', JSON.stringify(jobRunResponse, null, 2));
+        
+        const runtimeJobId = jobRunResponse.runtimeJobId || 
+                           jobRunResponse.entity?.job_run?.runtime_job_id ||
+                           jobRunResponse.entity?.runtime_job_id;
+        
+        const runId = jobRunResponse.metadata?.id || 
+                     jobRunResponse.id ||
+                     runtimeJobId;
+        
+        const statusUrl = jobRunResponse.statusUrl || 
+                         jobRunResponse.href || 
+                         jobRunResponse.metadata?.href ||
+                         jobRunResponse.entity?.href;
+        
+        console.log(`📋 Extracted identifiers:`);
+        console.log(`   Runtime Job ID: ${runtimeJobId || 'N/A'}`);
+        console.log(`   Run ID: ${runId || 'N/A'}`);
+        console.log(`   Status URL: ${statusUrl || 'N/A'}`);
+        
+        if (!runId && !statusUrl) {
+            throw new Error('No valid run ID or status URL found in job response');
+        }
         
         const accessToken = await getAccessToken();
         
-        // Si tenemos statusUrl, usarlo; sino construir el endpoint
+        // Construir URL de polling
         let apiUrl;
         if (statusUrl) {
             apiUrl = statusUrl;
+            console.log('🔗 Using provided status URL');
         } else {
             apiUrl = `https://api.dataplatform.cloud.ibm.com/v2/jobs/${IBM_CONFIG.jobId}/runs/${runId}?space_id=${IBM_CONFIG.spaceId}`;
+            console.log('🔗 Constructed status URL');
         }
+        
+        console.log(`📡 Polling URL: ${apiUrl}`);
+        console.log('=' .repeat(50) + '\n');
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            console.log(`📡 Polling attempt ${attempt}/${maxAttempts}`);
-            console.log(`🔗 Checking: ${apiUrl}`);
+            console.log(`📡 Polling attempt ${attempt}/${maxAttempts} - ${new Date().toLocaleTimeString()}`);
             
             try {
                 const response = await axios.get(apiUrl, {
@@ -419,40 +558,84 @@ async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 100
                 });
 
                 const runData = response.data;
-                const currentState = runData.entity?.job_run?.state || runData.entity?.status?.state || 'unknown';
                 
-                console.log(`📊 Current state: ${currentState}`);
-                console.log(`📊 Runtime Job ID: ${runData.entity?.job_run?.runtime_job_id || 'N/A'}`);
-
-                if (currentState === 'completed' || currentState === 'success') {
-                    console.log('✅ Job run completed successfully');
+                // Mejor extracción del estado con múltiples fallbacks
+                const currentState = runData.entity?.job_run?.state || 
+                                   runData.entity?.status?.state || 
+                                   runData.entity?.state ||
+                                   runData.state ||
+                                   runData.status?.state ||
+                                   'unknown';
+                
+                console.log(`   📊 Current state: "${currentState}"`);
+                console.log(`   📊 Response status: ${response.status}`);
+                
+                // Log más detalles para debugging
+                if (runData.entity?.job_run) {
+                    console.log(`   📊 Job run details:`, {
+                        runtime_job_id: runData.entity.job_run.runtime_job_id,
+                        state: runData.entity.job_run.state,
+                        created_at: runData.entity.job_run.created_at,
+                        completed_at: runData.entity.job_run.completed_at
+                    });
+                }
+                
+                // Estados de éxito - más opciones
+                const successStates = ['completed', 'success', 'finished', 'succeeded'];
+                if (successStates.includes(currentState.toLowerCase())) {
+                    console.log('✅ Job run completed successfully!');
+                    console.log('📥 Starting results download...\n');
                     
                     // Descargar archivos de resultados desde COS
                     const results = await downloadOptimizationResults();
+                    console.log('✅ Results downloaded and processed successfully');
                     return results;
+                }
+                
+                // Estados de fallo
+                const failureStates = ['failed', 'error', 'failure'];
+                if (failureStates.includes(currentState.toLowerCase())) {
+                    console.error('❌ Job run failed!');
+                    console.error('   Status details:', runData.entity?.job_run?.status || runData.entity?.status);
                     
-                } else if (currentState === 'failed' || currentState === 'error') {
-                    console.error('❌ Job run failed:', runData.entity?.job_run?.status || runData.entity?.status);
-                    throw new Error('Job run failed: ' + (runData.entity?.job_run?.status?.message || runData.entity?.status?.message || 'Unknown error'));
-                } else if (currentState === 'canceled' || currentState === 'cancelled') {
+                    const errorMessage = runData.entity?.job_run?.status?.message || 
+                                       runData.entity?.status?.message || 
+                                       'Unknown error occurred';
+                    
+                    throw new Error(`Job run failed: ${errorMessage}`);
+                }
+                
+                // Estados de cancelación
+                const canceledStates = ['canceled', 'cancelled', 'aborted'];
+                if (canceledStates.includes(currentState.toLowerCase())) {
                     throw new Error('Job run was canceled');
-                } else if (currentState === 'running' || currentState === 'pending' || currentState === 'queued') {
-                    console.log(`⏳ Job still ${currentState}, waiting...`);
+                }
+                
+                // Estados en progreso
+                const runningStates = ['running', 'pending', 'queued', 'starting', 'initializing', 'in_progress'];
+                if (runningStates.includes(currentState.toLowerCase())) {
+                    console.log(`   ⏳ Job still ${currentState}, continuing to wait...`);
                 } else {
-                    console.log(`🔄 Job state: ${currentState}, continuing to poll...`);
+                    console.log(`   🔄 Unknown state "${currentState}", continuing to poll...`);
                 }
 
-                // Wait before next attempt
+                // Esperar antes del siguiente intento
                 if (attempt < maxAttempts) {
-                    console.log(`⏳ Waiting ${intervalMs/1000} seconds before next check...`);
+                    console.log(`   ⏰ Waiting ${intervalMs/1000} seconds before next check...\n`);
                     await new Promise(resolve => setTimeout(resolve, intervalMs));
+                } else {
+                    console.log('   ⚠️ Max attempts reached\n');
                 }
                 
             } catch (error) {
                 if (error.response?.status === 404) {
-                    console.log(`⚠️ Run not found yet (attempt ${attempt}), job might still be starting...`);
+                    console.log(`   ⚠️ Run not found yet (attempt ${attempt}), job might still be starting...`);
+                } else if (error.response?.status === 401) {
+                    console.error('   ❌ Authentication failed, refreshing token...');
+                    // Refresh token for next attempt
+                    accessToken = await getAccessToken();
                 } else {
-                    console.log(`⚠️ Polling error (attempt ${attempt}):`, error.response?.status, error.message);
+                    console.log(`   ⚠️ Polling error (attempt ${attempt}):`, error.response?.status, error.message);
                 }
                 
                 if (attempt < maxAttempts) {
@@ -463,10 +646,19 @@ async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 100
             }
         }
 
-        throw new Error('Job timeout - maximum attempts reached');
+        throw new Error(`Job timeout - maximum attempts (${maxAttempts}) reached after ${(maxAttempts * intervalMs) / 60000} minutes`);
+        
     } catch (error) {
-        console.error('❌ Error polling job results:', error.response?.data || error.message);
-        throw new Error(`Failed to poll job results: ${error.response?.status || error.message}`);
+        console.error('\n❌ ERROR IN JOB POLLING:');
+        console.error('=' .repeat(50));
+        console.error('Error message:', error.message);
+        if (error.response) {
+            console.error('Response status:', error.response.status);
+            console.error('Response data:', error.response.data);
+        }
+        console.error('=' .repeat(50) + '\n');
+        
+        throw new Error(`Failed to poll job results: ${error.message}`);
     }
 }
 
@@ -618,8 +810,8 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        server: 'IBM Watson ML Job Executor with COS',
-        version: '4.1.0',
+        server: 'IBM Watson ML Job Executor with COS - FIXED VERSION',
+        version: '5.0.0',
         jobId: IBM_CONFIG.jobId,
         spaceId: IBM_CONFIG.spaceId,
         groupId: IBM_CONFIG.groupId,
@@ -627,8 +819,73 @@ app.get('/health', (req, res) => {
         iamEndpoints: [
             'https://iam.cloud.ibm.com/identity/token',
             'https://iam.cloud.ibm.com/v1/token'
+        ],
+        features: [
+            'Permission verification',
+            'Fallback execution methods',
+            'Enhanced error handling',
+            'ServiceId extraction'
         ]
     });
+});
+
+// Nueva ruta para verificar permisos antes de ejecutar
+app.get('/verify-permissions', async (req, res) => {
+    try {
+        console.log('🔍 Verifying space permissions...');
+        
+        const accessToken = await getAccessToken();
+        console.log('✅ Access token obtained successfully');
+        
+        try {
+            await verifySpaceAccess(accessToken);
+            console.log('✅ Space access verified successfully');
+            
+            res.json({
+                success: true,
+                hasAccess: true,
+                spaceId: IBM_CONFIG.spaceId,
+                jobId: IBM_CONFIG.jobId,
+                message: 'ServiceId has proper permissions for the space',
+                status: 'AUTHORIZED'
+            });
+            
+        } catch (permError) {
+            console.error('❌ Space access verification failed:', permError.message);
+            
+            res.status(403).json({
+                success: false,
+                hasAccess: false,
+                spaceId: IBM_CONFIG.spaceId,
+                jobId: IBM_CONFIG.jobId,
+                error: permError.message,
+                status: 'UNAUTHORIZED',
+                solution: {
+                    description: 'ServiceId needs to be added as a collaborator',
+                    steps: [
+                        '1. Go to Watson Studio/Cloud Pak for Data',
+                        '2. Navigate to your project/space',
+                        '3. Go to Manage → Access control',
+                        '4. Click "Add collaborators"',
+                        '5. Add the ServiceId with Editor or Admin role'
+                    ],
+                    projectUrl: `https://dataplatform.cloud.ibm.com/projects/${IBM_CONFIG.spaceId}`
+                }
+            });
+        }
+        
+    } catch (tokenError) {
+        console.error('❌ Token verification failed:', tokenError.message);
+        
+        res.status(401).json({
+            success: false,
+            hasAccess: false,
+            error: 'Failed to obtain access token',
+            details: tokenError.message,
+            status: 'TOKEN_ERROR',
+            solution: 'Check your API key configuration'
+        });
+    }
 });
 
 // Upload CSV files to IBM COS - NOMBRES SIMPLIFICADOS
@@ -745,7 +1002,7 @@ app.post('/upload-manual-data', async (req, res) => {
     }
 });
 
-// RUTA PRINCIPAL MODIFICADA: Ejecutar job existente
+// RUTA PRINCIPAL CORREGIDA: Ejecutar job existente con manejo mejorado de permisos
 app.post('/optimize', async (req, res) => {
     try {
         const { data, fromManual } = req.body;
@@ -753,6 +1010,7 @@ app.post('/optimize', async (req, res) => {
         console.log('🎯 Starting optimization with existing Watson ML Job...');
         console.log('📊 Data source:', fromManual ? 'Manual Input' : 'CSV Files');
         console.log('🆔 Job ID:', IBM_CONFIG.jobId);
+        console.log('🌐 Space ID:', IBM_CONFIG.spaceId);
         
         // Validar datos requeridos
         if (!data || !data.tasks || !data.resources || !data.demands) {
@@ -776,13 +1034,44 @@ app.post('/optimize', async (req, res) => {
             }
         }
 
-        // Ejecutar job existente
-        console.log('🚀 Executing existing Watson ML job...');
-        const jobRunResult = await executeExistingJob();
+        // Ejecutar job existente con manejo mejorado de permisos y fallbacks
+        console.log('🚀 Executing optimization job with fallback methods...');
+        
+        let jobRunResult;
+        try {
+            // Intentar con la función mejorada que incluye fallbacks
+            jobRunResult = await executeJobWithFallbacks();
+        } catch (error) {
+            // Si es error de permisos, enviar respuesta específica
+            if (error.response?.status === 403 || error.message.includes('PERMISSION DENIED')) {
+                return res.status(403).json({
+                    error: 'Permission denied',
+                    type: 'PERMISSION_ERROR',
+                    message: error.message,
+                    solution: {
+                        description: 'ServiceId needs to be added as a collaborator in Watson Studio',
+                        steps: [
+                            '1. Go to Watson Studio/Cloud Pak for Data',
+                            '2. Navigate to your project/space',
+                            '3. Go to Manage → Access control',
+                            '4. Add the ServiceId as a collaborator with Editor role',
+                            '5. Retry the optimization'
+                        ],
+                        serviceId: extractServiceIdFromError(error),
+                        spaceId: IBM_CONFIG.spaceId,
+                        projectUrl: `https://dataplatform.cloud.ibm.com/projects/${IBM_CONFIG.spaceId}`
+                    }
+                });
+            }
+            throw error;
+        }
         
         console.log('✅ Job run started successfully');
-        console.log('📋 Runtime Job ID:', jobRunResult.runtimeJobId);
-        console.log('📋 Job State:', jobRunResult.state);
+        console.log('📋 Job details:', {
+            id: jobRunResult.metadata?.id || jobRunResult.id,
+            state: jobRunResult.entity?.status?.state || jobRunResult.state,
+            href: jobRunResult.metadata?.href || jobRunResult.href
+        });
 
         // Hacer polling de resultados del run usando la respuesta completa
         console.log('⏳ Waiting for job run completion...');
@@ -793,19 +1082,55 @@ app.post('/optimize', async (req, res) => {
         res.json({ 
             success: true, 
             results: results,
-            runtimeJobId: jobRunResult.runtimeJobId,
-            runId: jobRunResult.metadata?.id,
-            jobId: IBM_CONFIG.jobId,
-            state: jobRunResult.state,
-            statusUrl: jobRunResult.statusUrl,
-            message: 'Optimization completed with existing Watson ML job'
+            jobDetails: {
+                runId: jobRunResult.metadata?.id || jobRunResult.id,
+                jobId: IBM_CONFIG.jobId,
+                state: jobRunResult.entity?.status?.state || jobRunResult.state,
+                statusUrl: jobRunResult.metadata?.href || jobRunResult.href,
+                createdAt: jobRunResult.metadata?.created_at || new Date().toISOString()
+            },
+            message: 'Optimization completed successfully with enhanced error handling'
         });
         
     } catch (error) {
         console.error('❌ Optimization error:', error);
-        res.status(500).json({ 
-            error: 'Optimization failed: ' + error.message,
-            details: error.stack 
+        
+        // Logging más detallado para debugging
+        if (error.response) {
+            console.error('📊 Error response status:', error.response.status);
+            console.error('📊 Error response data:', JSON.stringify(error.response.data, null, 2));
+        }
+        
+        // Manejo específico de errores comunes
+        let errorMessage = error.message;
+        let statusCode = 500;
+        let errorType = 'EXECUTION_ERROR';
+        
+        if (error.response?.status === 403) {
+            statusCode = 403;
+            errorType = 'PERMISSION_ERROR';
+            errorMessage = 'Permission denied: ServiceId not authorized for this space';
+        } else if (error.response?.status === 404) {
+            statusCode = 404;
+            errorType = 'NOT_FOUND_ERROR';
+            errorMessage = 'Job or space not found';
+        } else if (error.response?.status === 401) {
+            statusCode = 401;
+            errorType = 'AUTH_ERROR';
+            errorMessage = 'Authentication failed: Invalid API key';
+        }
+        
+        res.status(statusCode).json({ 
+            error: errorMessage,
+            type: errorType,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+            timestamp: new Date().toISOString(),
+            troubleshooting: statusCode === 403 ? {
+                issue: 'ServiceId lacks permissions',
+                solution: 'Add ServiceId as collaborator in Watson Studio',
+                spaceId: IBM_CONFIG.spaceId,
+                verifyEndpoint: '/verify-permissions'
+            } : undefined
         });
     }
 });
@@ -960,7 +1285,8 @@ app.use((error, req, res, next) => {
     console.error('💥 Unhandled error:', error);
     res.status(500).json({ 
         error: 'Internal server error', 
-        message: error.message 
+        message: error.message,
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -970,7 +1296,7 @@ app.use((error, req, res, next) => {
 
 app.listen(PORT, () => {
     console.log('\n' + '🚀'.repeat(20));
-    console.log(`🌟 IBM WATSON ML JOB EXECUTOR + COS SERVER`);
+    console.log(`🌟 IBM WATSON ML JOB EXECUTOR + COS SERVER - FIXED VERSION`);
     console.log(`🔗 URL: http://localhost:${PORT}`);
     console.log(`📁 Directory: ${__dirname}`);
     console.log(`🆔 Job ID: ${IBM_CONFIG.jobId}`);
@@ -979,15 +1305,36 @@ app.listen(PORT, () => {
     console.log(`🚀 Job Run Endpoint: ${IBM_CONFIG.jobRunEndpoint}`);
     console.log(`🗄️  COS Bucket: ${COS_CONFIG.bucketName}`);
     console.log(`🔑 API Key: ${IBM_CONFIG.apiKey.substring(0, 10)}...`);
+    console.log(`📦 Version: 5.0.0 - Enhanced with Permission Management`);
     console.log('🚀'.repeat(20) + '\n');
+    
+    console.log('🔧 NEW FEATURES IN THIS VERSION:');
+    console.log('   ✅ Permission verification before job execution');
+    console.log('   ✅ Fallback execution methods');
+    console.log('   ✅ Enhanced error handling for 403 errors');
+    console.log('   ✅ ServiceId extraction from error messages');
+    console.log('   ✅ Detailed troubleshooting information');
+    console.log('   ✅ New endpoint: GET /verify-permissions');
+    console.log('');
+    
+    console.log('🧪 TESTING ENDPOINTS:');
+    console.log('   🔍 GET  /verify-permissions  - Check if ServiceId has proper access');
+    console.log('   🏥 GET  /health             - Server status and configuration');
+    console.log('   📋 GET  /cos-files          - List files in COS bucket');
+    console.log('   🎯 POST /optimize           - Execute optimization (main endpoint)');
+    console.log('   🎮 POST /optimize-demo      - Demo mode with mock results');
+    console.log('');
     
     // Test COS connection
     console.log('🧪 Testing COS connection...');
     listCOSFiles().then(files => {
         console.log(`✅ COS connected successfully. Found ${files.length} files.`);
-        files.forEach(file => {
+        files.slice(0, 5).forEach(file => {
             console.log(`📄 ${file.Key} (${file.Size} bytes)`);
         });
+        if (files.length > 5) {
+            console.log(`   ... and ${files.length - 5} more files`);
+        }
     }).catch(error => {
         console.log(`❌ COS connection failed: ${error.message}`);
         console.log(`⚠️  You may need to create the bucket: ${COS_CONFIG.bucketName}`);
@@ -997,6 +1344,16 @@ app.listen(PORT, () => {
     console.log('🧪 Testing IAM token...');
     getAccessToken().then(token => {
         console.log(`✅ IAM token obtained successfully: ${token.substring(0, 20)}...`);
+        
+        // Test space access
+        console.log('🧪 Testing space access...');
+        verifySpaceAccess(token).then(hasAccess => {
+            console.log(`✅ Space access verified: ${hasAccess}`);
+        }).catch(error => {
+            console.log(`❌ Space access failed: ${error.message}`);
+            console.log(`🔧 SOLUTION: Use GET /verify-permissions for detailed instructions`);
+        });
+        
     }).catch(error => {
         console.log(`❌ IAM token failed: ${error.message}`);
     });
