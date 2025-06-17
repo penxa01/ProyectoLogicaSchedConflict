@@ -1,5 +1,5 @@
 // =============================================================================
-// Node.js Server with IBM Cloud Object Storage Integration - MEJORADO
+// Node.js Server with IBM Cloud Object Storage Integration - MODIFICADO
 // =============================================================================
 
 const express = require('express');
@@ -30,38 +30,44 @@ const COS_CONFIG = {
 };
 
 // =============================================================================
-// IBM Watson ML Configuration - ACTUALIZADO CON TUS IDs
+// IBM Watson Configuration - ACTUALIZADO CON TU JOB EXISTENTE Y GROUP ID
 // =============================================================================
 
 const IBM_CONFIG = {
     apiKey: 'C3g5p6YQe8rCH9xztTduzstOPz1CVT64fox7Gi5j7xLi',
-    deploymentId: 'f2f56eef-31dd-4efe-aa7a-25d1011c0860', // Tu ID de despliegue
-    jobId: 'af8c7532-a4cb-46a9-abda-97a19b4b5b9b', // Tu ID de trabajo
-    instanceId: 'crn:v1:bluemix:public:cloud-object-storage:global:a/d3c266a491d4414c9e4af3ad57209e3f:397f0b00-814e-41b7-9119-1103b8ab1ea2::',
-    baseUrl: 'https://us-south.ml.cloud.ibm.com/ml/v4',
-    iamUrl: 'https://iam.cloud.ibm.com/identity/token'
+    jobId: 'af8c7532-a4cb-46a9-abda-97a19b4b5b9b', // Tu Job ID existente
+    spaceId: 'dd18eb10-08af-4997-afd8-e23ea057ff93', // Tu Space ID
+    groupId: 'b6b35acd-fc65-4966-be66-98499d334c4c', // Tu Group ID
+    // Endpoint para ejecutar job existente
+    jobRunEndpoint: 'https://api.dataplatform.cloud.ibm.com/v2/jobs/af8c7532-a4cb-46a9-abda-97a19b4b5b9b/runs?space_id=dd18eb10-08af-4997-afd8-e23ea057ff93',
+    // Endpoint para consultar status del run
+    jobStatusEndpoint: 'https://api.dataplatform.cloud.ibm.com/v2/jobs/af8c7532-a4cb-46a9-abda-97a19b4b5b9b/runs',
+    // Endpoint para obtener token (actualizado)
+    iamUrl: 'https://iam.cloud.ibm.com/identity/token',
+    // Grant type correcto para IBM
+    grantType: 'urn:ibm:params:oauth:grant-type:apikey'
 };
 
 // =============================================================================
-// ARCHIVOS DE ENTRADA Y SALIDA ESPECÍFICOS
+// ARCHIVOS SIMPLIFICADOS - NOMBRES LIMPIOS
 // =============================================================================
 
 const FILE_MAPPING = {
     input: {
-        parameters: 'cloud-object-storage-cos-proyfinal-2f2.parameters.csv',
-        tasks: 'cloud-object-storage-cos-proyfinal-2f2.Tasks.csv', 
-        resources: 'cloud-object-storage-cos-proyfinal-2f2.TupleCapacity.csv',
-        demands: 'cloud-object-storage-cos-proyfinal-2f2.TaskResourceDemand.csv',
-        precedences: 'cloud-object-storage-cos-proyfinal-2f2.Precedences.csv'
+        parameters: 'parameters.csv',
+        tasks: 'Tasks.csv', 
+        resources: 'TupleCapacity.csv',
+        demands: 'TaskResourceDemand.csv',
+        precedences: 'Precedences.csv'
     },
     output: {
-        stats: 'cloud-object-storage-cos-proyfinal-2f2.stats.csv',
-        resourceUsage: 'cloud-object-storage-cos-proyfinal-2f2.ResourceUsageResults.csv',
-        taskSchedule: 'cloud-object-storage-cos-proyfinal-2f2.TaskScheduleOutput.csv',
-        resourceTimeline: 'cloud-object-storage-cos-proyfinal-2f2.ResourceTimelineOutput.csv',
-        solutionResults: 'cloud-object-storage-cos-proyfinal-2f2.SolutionResults.csv',
-        skip: 'cloud-object-storage-cos-proyfinal-2f2.skip.csv',
-        taskResourceUsage: 'cloud-object-storage-cos-proyfinal-2f2.TaskResourceUsageOutput.csv'
+        stats: 'stats.csv',
+        resourceUsage: 'ResourceUsageResults.csv',
+        taskSchedule: 'TaskScheduleOutput.csv',
+        resourceTimeline: 'ResourceTimelineOutput.csv',
+        solutionResults: 'SolutionResults.csv',
+        skip: 'skip.csv',
+        taskResourceUsage: 'TaskResourceUsageOutput.csv'
     }
 };
 
@@ -99,7 +105,7 @@ async function uploadToIBMCOS(fileName, fileContent, contentType = 'text/csv') {
         
         const params = {
             Bucket: COS_CONFIG.bucketName,
-            Key: fileName,
+            Key: fileName, // Nombre limpio, sin prefijos
             Body: fileContent,
             ContentType: contentType,
             Metadata: {
@@ -158,7 +164,7 @@ async function listCOSFiles(prefix = '') {
 }
 
 // =============================================================================
-// CSV Generation Functions - MEJORADAS
+// CSV Generation Functions
 // =============================================================================
 
 function generateCSVFromJSON(data, headers) {
@@ -202,7 +208,7 @@ function generateOptimizationCSVs(data) {
         csvFiles.tasks = {
             filename: FILE_MAPPING.input.tasks,
             content: generateCSVFromJSON(data.tasks, ['id', 'pt', 'smin', 'emax']),
-            type: 'tasks'
+            type: 'Tasks'
         };
     }
     
@@ -211,7 +217,7 @@ function generateOptimizationCSVs(data) {
         csvFiles.resources = {
             filename: FILE_MAPPING.input.resources,
             content: generateCSVFromJSON(data.resources, ['IDresource', 'capacity']),
-            type: 'resources'
+            type: 'TupleCapacity'
         };
     }
     
@@ -220,7 +226,7 @@ function generateOptimizationCSVs(data) {
         csvFiles.demands = {
             filename: FILE_MAPPING.input.demands,
             content: generateCSVFromJSON(data.demands, ['taskId', 'resourceId', 'demand']),
-            type: 'demands'
+            type: 'TaskResourceDemand'
         };
     }
     
@@ -229,7 +235,7 @@ function generateOptimizationCSVs(data) {
         csvFiles.precedences = {
             filename: FILE_MAPPING.input.precedences,
             content: generateCSVFromJSON(data.precedences, ['beforeId', 'afterId']),
-            type: 'precedences'
+            type: 'Precedences'
         };
     }
     
@@ -238,103 +244,111 @@ function generateOptimizationCSVs(data) {
 }
 
 // =============================================================================
-// IBM Watson ML Helper Functions - MEJORADAS
+// IBM Watson ML Helper Functions - MODIFICADAS PARA EJECUTAR JOB EXISTENTE
 // =============================================================================
 
 async function getAccessToken() {
     try {
         console.log('🔑 Getting access token from IBM...');
+        console.log('🆔 Group ID:', IBM_CONFIG.groupId);
         
-        const response = await axios.post(IBM_CONFIG.iamUrl, 
-            `grant_type=urn:iam:grant-type:apikey&apikey=${IBM_CONFIG.apiKey}`,
+        // Intentar múltiples configuraciones hasta encontrar la correcta
+        const authConfigs = [
             {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'application/json'
-                }
+                url: 'https://iam.cloud.ibm.com/identity/token',
+                grantType: 'urn:ibm:params:oauth:grant-type:apikey'
+            },
+            {
+                url: 'https://iam.cloud.ibm.com/v1/token', 
+                grantType: 'urn:ibm:params:oauth:grant-type:apikey'
+            },
+            {
+                url: 'https://iam.cloud.ibm.com/identity/token',
+                grantType: 'urn:iam:grant-type:apikey'
             }
-        );
+        ];
 
-        console.log('✅ Access token obtained successfully');
-        return response.data.access_token;
+        for (let i = 0; i < authConfigs.length; i++) {
+            const config = authConfigs[i];
+            console.log(`🔄 Trying config ${i + 1}: ${config.url} with ${config.grantType}`);
+            
+            try {
+                // Crear form data exactamente como en PHP
+                const formData = new URLSearchParams();
+                formData.append('grant_type', config.grantType);
+                formData.append('apikey', IBM_CONFIG.apiKey);
+
+                const response = await axios.post(config.url, formData, {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json'
+                    },
+                    timeout: 30000 // 30 segundos timeout
+                });
+
+                console.log('✅ Access token obtained successfully with config', i + 1);
+                console.log('🔑 Token expires in:', response.data.expires_in, 'seconds');
+                console.log('🎯 Token type:', response.data.token_type);
+                
+                return response.data.access_token;
+                
+            } catch (error) {
+                console.log(`❌ Config ${i + 1} failed:`, error.response?.status, error.response?.data?.errorMessage || error.message);
+                
+                if (i === authConfigs.length - 1) {
+                    // Es el último intento, lanzar el error
+                    throw error;
+                }
+                // Continuar con la siguiente configuración
+            }
+        }
+        
     } catch (error) {
-        console.error('❌ Error getting access token:', error.response?.data || error.message);
-        throw new Error(`Failed to get access token: ${error.response?.status || error.message}`);
+        console.error('❌ Error getting access token (all configs failed):', error.response?.data || error.message);
+        console.error('🔍 Final error details:', {
+            url: error.config?.url,
+            apiKey: IBM_CONFIG.apiKey ? `${IBM_CONFIG.apiKey.substring(0, 10)}...` : 'Missing',
+            groupId: IBM_CONFIG.groupId,
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            errorCode: error.response?.data?.errorCode,
+            errorMessage: error.response?.data?.errorMessage,
+            errorDetails: error.response?.data?.errorDetails
+        });
+        throw new Error(`Failed to get access token: ${error.response?.data?.errorMessage || error.message}`);
     }
 }
 
-async function createWatsonMLJob() {
+// NUEVA FUNCIÓN: Ejecutar job existente en lugar de crear uno nuevo
+async function executeExistingJob() {
     try {
-        console.log('🚀 Creating Watson ML job with specific job ID...');
+        console.log('🚀 Executing existing Watson ML job...');
+        console.log('🆔 Job ID:', IBM_CONFIG.jobId);
+        console.log('🌐 Space ID:', IBM_CONFIG.spaceId);
         
         const accessToken = await getAccessToken();
-        const apiUrl = `${IBM_CONFIG.baseUrl}/deployments/${IBM_CONFIG.deploymentId}/jobs`;
-
-        // Crear el job con referencias a los archivos en COS
+        
+        // Payload para ejecutar el job existente
         const payload = {
-            input_data_references: [
+            // Configuración para usar archivos de entrada desde COS
+            job_input_data_references: [
                 {
-                    id: "parameters_input",
-                    type: "connection_asset", 
-                    connection: {
-                        id: "cos_connection"
-                    },
-                    location: {
-                        bucket: COS_CONFIG.bucketName,
-                        path: FILE_MAPPING.input.parameters
-                    }
-                },
-                {
-                    id: "tasks_input",
                     type: "connection_asset",
                     connection: {
-                        id: "cos_connection"
+                        id: "coss_connection"
                     },
                     location: {
                         bucket: COS_CONFIG.bucketName,
-                        path: FILE_MAPPING.input.tasks
-                    }
-                },
-                {
-                    id: "resources_input", 
-                    type: "connection_asset",
-                    connection: {
-                        id: "cos_connection"
-                    },
-                    location: {
-                        bucket: COS_CONFIG.bucketName,
-                        path: FILE_MAPPING.input.resources
-                    }
-                },
-                {
-                    id: "demands_input",
-                    type: "connection_asset",
-                    connection: {
-                        id: "cos_connection" 
-                    },
-                    location: {
-                        bucket: COS_CONFIG.bucketName,
-                        path: FILE_MAPPING.input.demands
-                    }
-                },
-                {
-                    id: "precedences_input",
-                    type: "connection_asset",
-                    connection: {
-                        id: "cos_connection"
-                    },
-                    location: {
-                        bucket: COS_CONFIG.bucketName,
-                        path: FILE_MAPPING.input.precedences
+                        path: ""
                     }
                 }
             ],
-            output_data_references: [
+            // Configuración para guardar resultados en COS
+            job_output_data_references: [
                 {
-                    id: "optimization_results",
-                    type: "connection_asset",
+                    type: "connection_asset", 
                     connection: {
-                        id: "cos_connection"
+                        id: "coss_connection"
                     },
                     location: {
                         bucket: COS_CONFIG.bucketName,
@@ -344,58 +358,108 @@ async function createWatsonMLJob() {
             ]
         };
 
-        console.log('📤 Sending job creation payload to Watson ML...');
+        console.log('📤 Sending job execution request...');
+        console.log('🔗 Endpoint:', IBM_CONFIG.jobRunEndpoint);
 
-        const response = await axios.post(apiUrl, payload, {
+        // Enviar POST con body vacío (null) para ejecutar el job existente
+        const response = await axios.post(IBM_CONFIG.jobRunEndpoint, {}, {
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`,
-                'ML-Instance-ID': IBM_CONFIG.instanceId
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
             }
         });
 
-        console.log('✅ Watson ML job created successfully');
+        console.log('✅ Job execution started successfully');
+        console.log('📊 Response data:', response.data);
+        
         return response.data;
     } catch (error) {
-        console.error('❌ Error creating Watson ML job:', error.response?.data || error.message);
-        throw new Error(`Watson ML API error: ${error.response?.status || 'Unknown'} - ${error.response?.data?.message || error.message}`);
+        console.error('❌ Error executing job:', error.response?.data || error.message);
+        console.error('📊 Response status:', error.response?.status);
+        console.error('📊 Response headers:', error.response?.headers);
+        throw new Error(`Job execution failed: ${error.response?.status || 'Unknown'} - ${error.response?.data?.message || error.message}`);
     }
 }
 
-async function pollJobResults(jobId, maxAttempts = 30, intervalMs = 10000) {
+// FUNCIÓN MODIFICADA: Polling del estado del job run usando runtime_job_id
+async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 10000) {
     try {
-        console.log(`🔄 Polling job results for ${jobId}...`);
+        // Extraer runtime_job_id o usar el ID del metadata como fallback
+        const runtimeJobId = jobRunResponse.runtimeJobId || jobRunResponse.entity?.job_run?.runtime_job_id;
+        const runId = jobRunResponse.metadata?.id || runtimeJobId;
+        const statusUrl = jobRunResponse.statusUrl || jobRunResponse.href;
+        
+        console.log(`🔄 Polling job run results...`);
+        console.log(`📋 Runtime Job ID: ${runtimeJobId}`);
+        console.log(`📋 Run ID: ${runId}`);
+        console.log(`📋 Status URL: ${statusUrl}`);
         
         const accessToken = await getAccessToken();
-        const apiUrl = `${IBM_CONFIG.baseUrl}/deployments/jobs/${jobId}`;
+        
+        // Si tenemos statusUrl, usarlo; sino construir el endpoint
+        let apiUrl;
+        if (statusUrl) {
+            apiUrl = statusUrl;
+        } else {
+            apiUrl = `https://api.dataplatform.cloud.ibm.com/v2/jobs/${IBM_CONFIG.jobId}/runs/${runId}?space_id=${IBM_CONFIG.spaceId}`;
+        }
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            console.log(`📡 Polling attempt ${attempt}/${maxAttempts} for job ${jobId}`);
+            console.log(`📡 Polling attempt ${attempt}/${maxAttempts}`);
+            console.log(`🔗 Checking: ${apiUrl}`);
             
-            const response = await axios.get(apiUrl, {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'ML-Instance-ID': IBM_CONFIG.instanceId
+            try {
+                const response = await axios.get(apiUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Accept': 'application/json'
+                    },
+                    timeout: 30000
+                });
+
+                const runData = response.data;
+                const currentState = runData.entity?.job_run?.state || runData.entity?.status?.state || 'unknown';
+                
+                console.log(`📊 Current state: ${currentState}`);
+                console.log(`📊 Runtime Job ID: ${runData.entity?.job_run?.runtime_job_id || 'N/A'}`);
+
+                if (currentState === 'completed' || currentState === 'success') {
+                    console.log('✅ Job run completed successfully');
+                    
+                    // Descargar archivos de resultados desde COS
+                    const results = await downloadOptimizationResults();
+                    return results;
+                    
+                } else if (currentState === 'failed' || currentState === 'error') {
+                    console.error('❌ Job run failed:', runData.entity?.job_run?.status || runData.entity?.status);
+                    throw new Error('Job run failed: ' + (runData.entity?.job_run?.status?.message || runData.entity?.status?.message || 'Unknown error'));
+                } else if (currentState === 'canceled' || currentState === 'cancelled') {
+                    throw new Error('Job run was canceled');
+                } else if (currentState === 'running' || currentState === 'pending' || currentState === 'queued') {
+                    console.log(`⏳ Job still ${currentState}, waiting...`);
+                } else {
+                    console.log(`🔄 Job state: ${currentState}, continuing to poll...`);
                 }
-            });
 
-            const jobData = response.data;
-            console.log(`📊 Job status: ${jobData.entity?.status?.state}`);
-
-            if (jobData.entity?.status?.state === 'completed') {
-                console.log('✅ Job completed successfully');
+                // Wait before next attempt
+                if (attempt < maxAttempts) {
+                    console.log(`⏳ Waiting ${intervalMs/1000} seconds before next check...`);
+                    await new Promise(resolve => setTimeout(resolve, intervalMs));
+                }
                 
-                // Descargar archivos de resultados desde COS
-                const results = await downloadOptimizationResults();
-                return results;
+            } catch (error) {
+                if (error.response?.status === 404) {
+                    console.log(`⚠️ Run not found yet (attempt ${attempt}), job might still be starting...`);
+                } else {
+                    console.log(`⚠️ Polling error (attempt ${attempt}):`, error.response?.status, error.message);
+                }
                 
-            } else if (jobData.entity?.status?.state === 'failed') {
-                throw new Error('Job failed: ' + (jobData.entity?.status?.message || 'Unknown error'));
-            }
-
-            // Wait before next attempt
-            if (attempt < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, intervalMs));
+                if (attempt < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, intervalMs));
+                } else {
+                    throw error;
+                }
             }
         }
 
@@ -407,7 +471,7 @@ async function pollJobResults(jobId, maxAttempts = 30, intervalMs = 10000) {
 }
 
 // =============================================================================
-// NUEVAS FUNCIONES PARA MANEJAR RESULTADOS DESDE COS
+// FUNCIONES PARA MANEJAR RESULTADOS DESDE COS
 // =============================================================================
 
 async function downloadOptimizationResults() {
@@ -423,57 +487,64 @@ async function downloadOptimizationResults() {
             taskResourceUsage: []
         };
         
-        // Descargar archivo de solución
-        try {
-            const solutionData = await downloadFromIBMCOS(FILE_MAPPING.output.solutionResults);
-            results.solutionSummary = parseCSVContent(solutionData);
-            console.log('✅ Solution results downloaded');
-        } catch (error) {
-            console.log('⚠️ Solution results not found, using default');
-            results.solutionSummary = [{ Makespan: 0, TotalTasks: 0, TotalResources: 0, Status: 'UNKNOWN' }];
+        // Lista de archivos de salida a buscar
+        const outputFiles = [
+            { key: 'solutionSummary', filename: FILE_MAPPING.output.solutionResults },
+            { key: 'taskSchedule', filename: FILE_MAPPING.output.taskSchedule },
+            { key: 'resourceUsage', filename: FILE_MAPPING.output.resourceUsage },
+            { key: 'resourceTimeline', filename: FILE_MAPPING.output.resourceTimeline },
+            { key: 'stats', filename: FILE_MAPPING.output.stats },
+            { key: 'taskResourceUsage', filename: FILE_MAPPING.output.taskResourceUsage }
+        ];
+
+        // También buscar en carpeta output/ por si el job guarda ahí
+        const outputPrefixes = ['', 'output/', 'results/'];
+        
+        for (const file of outputFiles) {
+            let found = false;
+            
+            for (const prefix of outputPrefixes) {
+                try {
+                    const fullPath = prefix + file.filename;
+                    console.log(`🔍 Trying to download: ${fullPath}`);
+                    
+                    const fileData = await downloadFromIBMCOS(fullPath);
+                    results[file.key] = parseCSVContent(fileData);
+                    console.log(`✅ ${file.key} downloaded successfully from ${fullPath}`);
+                    found = true;
+                    break;
+                } catch (error) {
+                    console.log(`⚠️ ${fullPath} not found, trying next location...`);
+                }
+            }
+            
+            if (!found) {
+                console.log(`⚠️ ${file.key} not found in any location, using default`);
+                results[file.key] = [];
+            }
         }
         
-        // Descargar programación de tareas
-        try {
-            const scheduleData = await downloadFromIBMCOS(FILE_MAPPING.output.taskSchedule);
-            results.taskSchedule = parseCSVContent(scheduleData);
-            console.log('✅ Task schedule downloaded');
-        } catch (error) {
-            console.log('⚠️ Task schedule not found, using default');
-            results.taskSchedule = [];
-        }
-        
-        // Descargar uso de recursos
-        try {
-            const resourceData = await downloadFromIBMCOS(FILE_MAPPING.output.resourceUsage);
-            results.resourceUsage = parseCSVContent(resourceData);
-            console.log('✅ Resource usage downloaded');
-        } catch (error) {
-            console.log('⚠️ Resource usage not found, using default');
-            results.resourceUsage = [];
-        }
-        
-        // Descargar timeline de recursos
-        try {
-            const timelineData = await downloadFromIBMCOS(FILE_MAPPING.output.resourceTimeline);
-            results.resourceTimeline = parseCSVContent(timelineData);
-            console.log('✅ Resource timeline downloaded');
-        } catch (error) {
-            console.log('⚠️ Resource timeline not found, using default');
-            results.resourceTimeline = [];
-        }
-        
-        // Descargar estadísticas
-        try {
-            const statsData = await downloadFromIBMCOS(FILE_MAPPING.output.stats);
-            results.stats = parseCSVContent(statsData);
-            console.log('✅ Stats downloaded');
-        } catch (error) {
-            console.log('⚠️ Stats not found, using default');
-            results.stats = [];
+        // Si no encontramos resultados, generar datos de ejemplo
+        if (results.solutionSummary.length === 0) {
+            console.log('📊 No solution results found, generating default summary...');
+            results.solutionSummary = [{ 
+                Makespan: 0, 
+                TotalTasks: 0, 
+                TotalResources: 0, 
+                Status: 'NO_RESULTS_FOUND' 
+            }];
         }
         
         console.log('✅ All optimization results processed');
+        console.log('📊 Results summary:', {
+            solutionSummary: results.solutionSummary.length,
+            taskSchedule: results.taskSchedule.length,
+            resourceUsage: results.resourceUsage.length,
+            resourceTimeline: results.resourceTimeline.length,
+            stats: results.stats.length,
+            taskResourceUsage: results.taskResourceUsage.length
+        });
+        
         return results;
         
     } catch (error) {
@@ -547,14 +618,20 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        server: 'IBM Watson ML Optimizer with COS',
-        version: '3.0.0',
+        server: 'IBM Watson ML Job Executor with COS',
+        version: '4.1.0',
         jobId: IBM_CONFIG.jobId,
-        deploymentId: IBM_CONFIG.deploymentId
+        spaceId: IBM_CONFIG.spaceId,
+        groupId: IBM_CONFIG.groupId,
+        jobRunEndpoint: IBM_CONFIG.jobRunEndpoint,
+        iamEndpoints: [
+            'https://iam.cloud.ibm.com/identity/token',
+            'https://iam.cloud.ibm.com/v1/token'
+        ]
     });
 });
 
-// Upload CSV files to IBM COS
+// Upload CSV files to IBM COS - NOMBRES SIMPLIFICADOS
 app.post('/upload-csv', upload.single('file'), async (req, res) => {
     console.log('📁 CSV Upload request received');
     
@@ -570,24 +647,23 @@ app.post('/upload-csv', upload.single('file'), async (req, res) => {
         const data = await parseCSVData(req.file.buffer);
         console.log('✅ CSV parsed successfully, rows:', data.length);
         
-        // Generate appropriate filename based on file type
+        // Map to correct filename format - NOMBRES LIMPIOS
         let fileName = req.file.originalname;
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         
-        // Map to correct filename format
-        if (fileName.includes('parameter')) {
-            fileName = FILE_MAPPING.input.parameters;
+        if (fileName.includes('parameter') || fileName.toLowerCase().includes('param')) {
+            fileName = FILE_MAPPING.input.parameters; // parameters.csv
         } else if (fileName.includes('task') && !fileName.includes('demand')) {
-            fileName = FILE_MAPPING.input.tasks;
-        } else if (fileName.includes('resource') && !fileName.includes('demand')) {
-            fileName = FILE_MAPPING.input.resources;
+            fileName = FILE_MAPPING.input.tasks; // Tasks.csv
+        } else if ((fileName.includes('resource') || fileName.includes('capacity')) && !fileName.includes('demand')) {
+            fileName = FILE_MAPPING.input.resources; // TupleCapacity.csv
         } else if (fileName.includes('demand')) {
-            fileName = FILE_MAPPING.input.demands;
+            fileName = FILE_MAPPING.input.demands; // TaskResourceDemand.csv
         } else if (fileName.includes('precedence')) {
-            fileName = FILE_MAPPING.input.precedences;
-        } else {
-            fileName = `${timestamp}_${req.file.originalname}`;
+            fileName = FILE_MAPPING.input.precedences; // Precedences.csv
         }
+        // Si no coincide con ningún patrón, mantener nombre original
+        
+        console.log(`📝 Mapping ${req.file.originalname} → ${fileName}`);
         
         // Upload file to IBM COS
         const uploadResult = await uploadToIBMCOS(fileName, req.file.buffer, 'text/csv');
@@ -610,7 +686,7 @@ app.post('/upload-csv', upload.single('file'), async (req, res) => {
     }
 });
 
-// Process manual data and upload to COS
+// Process manual data and upload to COS - NOMBRES SIMPLIFICADOS
 app.post('/upload-manual-data', async (req, res) => {
     console.log('📝 Manual data upload request received');
     
@@ -623,7 +699,7 @@ app.post('/upload-manual-data', async (req, res) => {
 
         console.log('📊 Converting manual data to optimization CSV format...');
         
-        // Generate CSV files from manual data with correct naming
+        // Generate CSV files from manual data with clean naming
         const csvFiles = generateOptimizationCSVs(data);
         
         console.log('📤 Uploading CSV files to IBM COS...');
@@ -669,13 +745,14 @@ app.post('/upload-manual-data', async (req, res) => {
     }
 });
 
-// NUEVA RUTA: Optimizar con Watson ML Job completo
+// RUTA PRINCIPAL MODIFICADA: Ejecutar job existente
 app.post('/optimize', async (req, res) => {
     try {
         const { data, fromManual } = req.body;
         
-        console.log('🎯 Starting optimization with Watson ML Job...');
+        console.log('🎯 Starting optimization with existing Watson ML Job...');
         console.log('📊 Data source:', fromManual ? 'Manual Input' : 'CSV Files');
+        console.log('🆔 Job ID:', IBM_CONFIG.jobId);
         
         // Validar datos requeridos
         if (!data || !data.tasks || !data.resources || !data.demands) {
@@ -699,27 +776,29 @@ app.post('/optimize', async (req, res) => {
             }
         }
 
-        // Crear y ejecutar Watson ML Job
-        console.log('🚀 Creating Watson ML job...');
-        const jobResult = await createWatsonMLJob();
+        // Ejecutar job existente
+        console.log('🚀 Executing existing Watson ML job...');
+        const jobRunResult = await executeExistingJob();
         
-        if (!jobResult.metadata || !jobResult.metadata.id) {
-            throw new Error('Failed to get job ID from Watson ML');
-        }
+        console.log('✅ Job run started successfully');
+        console.log('📋 Runtime Job ID:', jobRunResult.runtimeJobId);
+        console.log('📋 Job State:', jobRunResult.state);
 
-        console.log('✅ Job created with ID:', jobResult.metadata.id);
-
-        // Hacer polling de resultados
-        console.log('⏳ Waiting for job completion...');
-        const results = await pollJobResults(jobResult.metadata.id);
+        // Hacer polling de resultados del run usando la respuesta completa
+        console.log('⏳ Waiting for job run completion...');
+        const results = await pollJobResults(jobRunResult);
         
         console.log('✅ Optimization completed successfully');
 
         res.json({ 
             success: true, 
             results: results,
-            jobId: jobResult.metadata.id,
-            message: 'Optimization completed with real Watson ML job'
+            runtimeJobId: jobRunResult.runtimeJobId,
+            runId: jobRunResult.metadata?.id,
+            jobId: IBM_CONFIG.jobId,
+            state: jobRunResult.state,
+            statusUrl: jobRunResult.statusUrl,
+            message: 'Optimization completed with existing Watson ML job'
         });
         
     } catch (error) {
@@ -891,21 +970,35 @@ app.use((error, req, res, next) => {
 
 app.listen(PORT, () => {
     console.log('\n' + '🚀'.repeat(20));
-    console.log(`🌟 IBM WATSON ML + COS OPTIMIZER SERVER (MEJORADO)`);
+    console.log(`🌟 IBM WATSON ML JOB EXECUTOR + COS SERVER`);
     console.log(`🔗 URL: http://localhost:${PORT}`);
     console.log(`📁 Directory: ${__dirname}`);
-    console.log(`🔧 Deployment ID: ${IBM_CONFIG.deploymentId}`);
-    console.log(`💼 Job ID: ${IBM_CONFIG.jobId}`);
+    console.log(`🆔 Job ID: ${IBM_CONFIG.jobId}`);
+    console.log(`🌐 Space ID: ${IBM_CONFIG.spaceId}`);
+    console.log(`👥 Group ID: ${IBM_CONFIG.groupId}`);
+    console.log(`🚀 Job Run Endpoint: ${IBM_CONFIG.jobRunEndpoint}`);
     console.log(`🗄️  COS Bucket: ${COS_CONFIG.bucketName}`);
+    console.log(`🔑 API Key: ${IBM_CONFIG.apiKey.substring(0, 10)}...`);
     console.log('🚀'.repeat(20) + '\n');
     
     // Test COS connection
     console.log('🧪 Testing COS connection...');
     listCOSFiles().then(files => {
         console.log(`✅ COS connected successfully. Found ${files.length} files.`);
+        files.forEach(file => {
+            console.log(`📄 ${file.Key} (${file.Size} bytes)`);
+        });
     }).catch(error => {
         console.log(`❌ COS connection failed: ${error.message}`);
         console.log(`⚠️  You may need to create the bucket: ${COS_CONFIG.bucketName}`);
+    });
+    
+    // Test IAM token
+    console.log('🧪 Testing IAM token...');
+    getAccessToken().then(token => {
+        console.log(`✅ IAM token obtained successfully: ${token.substring(0, 20)}...`);
+    }).catch(error => {
+        console.log(`❌ IAM token failed: ${error.message}`);
     });
 });
 
