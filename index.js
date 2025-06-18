@@ -100,7 +100,7 @@ const upload = multer({ storage: storage });
 
 async function uploadToIBMCOS(fileName, fileContent, contentType = 'text/csv') {
     try {
-        console.log(`📤 Uploading ${fileName} to IBM COS...`);
+        console.log(`Uploading ${fileName} to IBM COS...`);
         
         const params = {
             Bucket: COS_CONFIG.bucketName,
@@ -114,7 +114,7 @@ async function uploadToIBMCOS(fileName, fileContent, contentType = 'text/csv') {
         };
 
         const result = await cosClient.upload(params).promise();
-        console.log(`✅ File uploaded successfully to: ${result.Location}`);
+        console.log(`File uploaded successfully to: ${result.Location}`);
         
         return {
             success: true,
@@ -123,14 +123,14 @@ async function uploadToIBMCOS(fileName, fileContent, contentType = 'text/csv') {
             etag: result.ETag
         };
     } catch (error) {
-        console.error(`❌ Error uploading ${fileName} to COS:`, error);
+        console.error(`Error uploading ${fileName} to COS:`, error);
         throw new Error(`Failed to upload to COS: ${error.message}`);
     }
 }
 
 async function downloadFromIBMCOS(fileName) {
     try {
-        console.log(`📥 Downloading ${fileName} from IBM COS...`);
+        console.log(`Downloading ${fileName} from IBM COS...`);
         
         const params = {
             Bucket: COS_CONFIG.bucketName,
@@ -138,11 +138,11 @@ async function downloadFromIBMCOS(fileName) {
         };
 
         const result = await cosClient.getObject(params).promise();
-        console.log(`✅ File downloaded successfully from COS`);
+        console.log(`File downloaded successfully from COS`);
         
         return result.Body.toString('utf-8');
     } catch (error) {
-        console.error(`❌ Error downloading ${fileName} from COS:`, error);
+        console.error(`Error downloading ${fileName} from COS:`, error);
         throw new Error(`Failed to download from COS: ${error.message}`);
     }
 }
@@ -157,7 +157,7 @@ async function listCOSFiles(prefix = '') {
         const result = await cosClient.listObjectsV2(params).promise();
         return result.Contents || [];
     } catch (error) {
-        console.error('❌ Error listing COS files:', error);
+        console.error('Error listing COS files:', error);
         return [];
     }
 }
@@ -189,7 +189,7 @@ function generateCSVFromJSON(data, headers) {
 }
 
 function generateOptimizationCSVs(data) {
-    console.log('🔄 Generating optimization CSVs with correct format...');
+    console.log('Generating optimization CSVs with correct format...');
     
     const csvFiles = {};
     
@@ -238,7 +238,7 @@ function generateOptimizationCSVs(data) {
         };
     }
     
-    console.log('✅ Generated CSV files:', Object.keys(csvFiles));
+    console.log('Generated CSV files:', Object.keys(csvFiles));
     return csvFiles;
 }
 
@@ -248,8 +248,8 @@ function generateOptimizationCSVs(data) {
 
 async function getAccessToken() {
     try {
-        console.log('🔑 Getting access token from IBM...');
-        console.log('🆔 Group ID:', IBM_CONFIG.groupId);
+        console.log('Getting access token from IBM...');
+        console.log('Group ID:', IBM_CONFIG.groupId);
         
         // Intentar múltiples configuraciones hasta encontrar la correcta
         const authConfigs = [
@@ -269,7 +269,7 @@ async function getAccessToken() {
 
         for (let i = 0; i < authConfigs.length; i++) {
             const config = authConfigs[i];
-            console.log(`🔄 Trying config ${i + 1}: ${config.url} with ${config.grantType}`);
+            console.log(`Trying config ${i + 1}: ${config.url} with ${config.grantType}`);
             
             try {
                 // Crear form data exactamente como en PHP
@@ -285,14 +285,14 @@ async function getAccessToken() {
                     timeout: 30000 // 30 segundos timeout
                 });
 
-                console.log('✅ Access token obtained successfully with config', i + 1);
-                console.log('🔑 Token expires in:', response.data.expires_in, 'seconds');
-                console.log('🎯 Token type:', response.data.token_type);
+                console.log('Access token obtained successfully with config', i + 1);
+                console.log('Token expires in:', response.data.expires_in, 'seconds');
+                console.log('Token type:', response.data.token_type);
                 
                 return response.data.access_token;
                 
             } catch (error) {
-                console.log(`❌ Config ${i + 1} failed:`, error.response?.status, error.response?.data?.errorMessage || error.message);
+                console.log(`Config ${i + 1} failed:`, error.response?.status, error.response?.data?.errorMessage || error.message);
                 
                 if (i === authConfigs.length - 1) {
                     // Es el último intento, lanzar el error
@@ -303,8 +303,8 @@ async function getAccessToken() {
         }
         
     } catch (error) {
-        console.error('❌ Error getting access token (all configs failed):', error.response?.data || error.message);
-        console.error('🔍 Final error details:', {
+        console.error('Error getting access token (all configs failed):', error.response?.data || error.message);
+        console.error('Final error details:', {
             url: error.config?.url,
             apiKey: IBM_CONFIG.apiKey ? `${IBM_CONFIG.apiKey.substring(0, 10)}...` : 'Missing',
             groupId: IBM_CONFIG.groupId,
@@ -321,9 +321,9 @@ async function getAccessToken() {
 // FUNCIÓN CORREGIDA: Ejecutar job existente con manejo de permisos mejorado
 async function executeExistingJob() {
     try {
-        console.log('🚀 Executing existing Watson ML job...');
-        console.log('🆔 Job ID:', IBM_CONFIG.jobId);
-        console.log('🌐 Space ID:', IBM_CONFIG.spaceId);
+        console.log('Executing existing Watson ML job...');
+        console.log('Job ID:', IBM_CONFIG.jobId);
+        console.log('Space ID:', IBM_CONFIG.spaceId);
         
         const accessToken = await getAccessToken();
         
@@ -332,11 +332,7 @@ async function executeExistingJob() {
             await verifySpaceAccess(accessToken);
         } catch (permError) {
             if (permError.message.includes('not authorized')) {
-                console.error('🚫 CRITICAL: ServiceId not authorized for space');
-                console.error('🔧 REQUIRED ACTION: Add ServiceId as collaborator in Watson Studio');
-                console.error('   📍 Go to: https://dataplatform.cloud.ibm.com/projects/' + IBM_CONFIG.spaceId);
-                console.error('   🔹 Navigate: Manage → Access control → Add collaborators');
-                console.error('   🔹 Role: Editor or Admin');
+                console.error('CRITICAL: ServiceId not authorized for space');
                 throw permError;
             }
         }
@@ -344,8 +340,8 @@ async function executeExistingJob() {
         // Payload mínimo - no incluir parámetros que puedan causar problemas de permisos
         const payload = {};
 
-        console.log('📤 Sending job execution request...');
-        console.log('🔗 Endpoint:', IBM_CONFIG.jobRunEndpoint);
+        console.log('Sending job execution request...');
+        console.log('Endpoint:', IBM_CONFIG.jobRunEndpoint);
 
         // Enviar POST para ejecutar el job existente
         const response = await axios.post(IBM_CONFIG.jobRunEndpoint, payload, {
@@ -358,19 +354,19 @@ async function executeExistingJob() {
             timeout: 60000
         });
 
-        console.log('✅ Job execution started successfully');
-        console.log('📊 Response data:', response.data);
+        console.log('Job execution started successfully');
+        console.log('Response data:', response.data);
         
         return response.data;
         
     } catch (error) {
-        console.error('❌ Error executing job:', error.response?.data || error.message);
-        console.error('📊 Response status:', error.response?.status);
+        console.error('Error executing job:', error.response?.data || error.message);
+        console.error('Response status:', error.response?.status);
         
         // Manejo específico de errores de permisos
         if (error.response?.status === 403) {
             const errorDetails = error.response?.data;
-            console.error('🚫 PERMISSION ERROR DETAILS:');
+            console.error('PERMISSION ERROR DETAILS:');
             console.error('   Code:', errorDetails?.code);
             console.error('   Reason:', errorDetails?.reason);
             console.error('   Message:', errorDetails?.message);
@@ -379,8 +375,8 @@ async function executeExistingJob() {
             const serviceIdMatch = errorDetails?.reason?.match(/ServiceId-[a-f0-9\-]+/);
             const serviceId = serviceIdMatch ? serviceIdMatch[0] : 'Unknown';
             
-            console.error('🆔 ServiceId:', serviceId);
-            console.error('🌐 Space ID:', IBM_CONFIG.spaceId);
+            console.error('ServiceId:', serviceId);
+            console.error('Space ID:', IBM_CONFIG.spaceId);
             
             throw new Error(`PERMISSION DENIED: ServiceId '${serviceId}' not authorized for space '${IBM_CONFIG.spaceId}'. Please add the ServiceId as a collaborator with Editor role in Watson Studio.`);
         }
@@ -392,7 +388,7 @@ async function executeExistingJob() {
 // FUNCIÓN AUXILIAR: Verificar acceso al space
 async function verifySpaceAccess(accessToken) {
     try {
-        console.log('🔍 Verifying space access...');
+        console.log('Verifying space access...');
         
         const spaceInfoUrl = `https://api.dataplatform.cloud.ibm.com/v2/spaces/${IBM_CONFIG.spaceId}`;
         
@@ -404,8 +400,8 @@ async function verifySpaceAccess(accessToken) {
             timeout: 30000
         });
         
-        console.log('✅ Space access verified successfully');
-        console.log('📋 Space info:', {
+        console.log('Space access verified successfully');
+        console.log('Space info:', {
             id: response.data.metadata?.id,
             name: response.data.entity?.name,
             status: response.data.entity?.status?.state
@@ -417,7 +413,7 @@ async function verifySpaceAccess(accessToken) {
         if (error.response?.status === 403) {
             throw new Error('ServiceId not authorized for space');
         }
-        console.warn('⚠️ Could not verify space access, but continuing...');
+        console.warn('Could not verify space access, but continuing...');
         return false;
     }
 }
@@ -436,7 +432,7 @@ function extractServiceIdFromError(error) {
 // FUNCIÓN ALTERNATIVA: Ejecutar usando endpoint directo de Watson ML
 async function executeJobWithWatsonML() {
     try {
-        console.log('🎯 Attempting execution via Watson ML endpoint...');
+        console.log('Attempting execution via Watson ML endpoint...');
         
         const accessToken = await getAccessToken();
         
@@ -448,8 +444,8 @@ async function executeJobWithWatsonML() {
             job_id: IBM_CONFIG.jobId
         };
         
-        console.log('📤 Sending Watson ML job execution request...');
-        console.log('🔗 Endpoint:', watsonMLEndpoint);
+        console.log('Sending Watson ML job execution request...');
+        console.log('Endpoint:', watsonMLEndpoint);
         
         const response = await axios.post(watsonMLEndpoint, payload, {
             headers: {
@@ -460,11 +456,11 @@ async function executeJobWithWatsonML() {
             timeout: 60000
         });
         
-        console.log('✅ Watson ML job execution started successfully');
+        console.log('Watson ML job execution started successfully');
         return response.data;
         
     } catch (error) {
-        console.error('❌ Watson ML execution failed:', error.response?.data || error.message);
+        console.error('Watson ML execution failed:', error.response?.data || error.message);
         throw error;
     }
 }
@@ -480,12 +476,12 @@ async function executeJobWithFallbacks() {
     
     for (const method of methods) {
         try {
-            console.log(`🔄 Trying method: ${method.name}`);
+            console.log(`Trying method: ${method.name}`);
             const result = await method.func();
-            console.log(`✅ Success with method: ${method.name}`);
+            console.log(`Success with method: ${method.name}`);
             return result;
         } catch (error) {
-            console.log(`❌ Method ${method.name} failed:`, error.message);
+            console.log(`Method ${method.name} failed:`, error.message);
             lastError = error;
             
             // Si es un error 403, no intentar otros métodos
@@ -502,11 +498,11 @@ async function executeJobWithFallbacks() {
 // FUNCIÓN MODIFICADA: Polling del estado del job run usando runtime_job_id
 async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 10000) {
     try {
-        console.log('\n🔄 STARTING JOB POLLING');
+        console.log('\nSTARTING JOB POLLING');
         console.log('=' .repeat(50));
         
         // Extraer información del job run response con mejor logging
-        console.log('📋 Raw job run response:', JSON.stringify(jobRunResponse, null, 2));
+        console.log('Raw job run response:', JSON.stringify(jobRunResponse, null, 2));
         
         const runtimeJobId = jobRunResponse.runtimeJobId || 
                            jobRunResponse.entity?.job_run?.runtime_job_id ||
@@ -521,7 +517,7 @@ async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 100
                          jobRunResponse.metadata?.href ||
                          jobRunResponse.entity?.href;
         
-        console.log(`📋 Extracted identifiers:`);
+        console.log(`Extracted identifiers:`);
         console.log(`   Runtime Job ID: ${runtimeJobId || 'N/A'}`);
         console.log(`   Run ID: ${runId || 'N/A'}`);
         console.log(`   Status URL: ${statusUrl || 'N/A'}`);
@@ -542,11 +538,11 @@ async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 100
             console.log('🔗 Constructed status URL');
         }
         
-        console.log(`📡 Polling URL: ${apiUrl}`);
+        console.log(`Polling URL: ${apiUrl}`);
         console.log('=' .repeat(50) + '\n');
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            console.log(`📡 Polling attempt ${attempt}/${maxAttempts} - ${new Date().toLocaleTimeString()}`);
+            console.log(`Polling attempt ${attempt}/${maxAttempts} - ${new Date().toLocaleTimeString()}`);
             
             try {
                 const response = await axios.get(apiUrl, {
@@ -567,12 +563,12 @@ async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 100
                                    runData.status?.state ||
                                    'unknown';
                 
-                console.log(`   📊 Current state: "${currentState}"`);
-                console.log(`   📊 Response status: ${response.status}`);
+                console.log(`   Current state: "${currentState}"`);
+                console.log(`   Response status: ${response.status}`);
                 
                 // Log más detalles para debugging
                 if (runData.entity?.job_run) {
-                    console.log(`   📊 Job run details:`, {
+                    console.log(`   Job run details:`, {
                         runtime_job_id: runData.entity.job_run.runtime_job_id,
                         state: runData.entity.job_run.state,
                         created_at: runData.entity.job_run.created_at,
@@ -583,19 +579,19 @@ async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 100
                 // Estados de éxito - más opciones
                 const successStates = ['completed', 'success', 'finished', 'succeeded'];
                 if (successStates.includes(currentState.toLowerCase())) {
-                    console.log('✅ Job run completed successfully!');
-                    console.log('📥 Starting results download...\n');
+                    console.log('Job run completed successfully!');
+                    console.log('Starting results download...\n');
                     
                     // Descargar archivos de resultados desde COS
                     const results = await downloadOptimizationResults();
-                    console.log('✅ Results downloaded and processed successfully');
+                    console.log('Results downloaded and processed successfully');
                     return results;
                 }
                 
                 // Estados de fallo
                 const failureStates = ['failed', 'error', 'failure'];
                 if (failureStates.includes(currentState.toLowerCase())) {
-                    console.error('❌ Job run failed!');
+                    console.error('Job run failed!');
                     console.error('   Status details:', runData.entity?.job_run?.status || runData.entity?.status);
                     
                     const errorMessage = runData.entity?.job_run?.status?.message || 
@@ -614,28 +610,28 @@ async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 100
                 // Estados en progreso
                 const runningStates = ['running', 'pending', 'queued', 'starting', 'initializing', 'in_progress'];
                 if (runningStates.includes(currentState.toLowerCase())) {
-                    console.log(`   ⏳ Job still ${currentState}, continuing to wait...`);
+                    console.log(`   Job still ${currentState}, continuing to wait...`);
                 } else {
-                    console.log(`   🔄 Unknown state "${currentState}", continuing to poll...`);
+                    console.log(`   Unknown state "${currentState}", continuing to poll...`);
                 }
 
                 // Esperar antes del siguiente intento
                 if (attempt < maxAttempts) {
-                    console.log(`   ⏰ Waiting ${intervalMs/1000} seconds before next check...\n`);
+                    console.log(`   Waiting ${intervalMs/1000} seconds before next check...\n`);
                     await new Promise(resolve => setTimeout(resolve, intervalMs));
                 } else {
-                    console.log('   ⚠️ Max attempts reached\n');
+                    console.log('   Max attempts reached\n');
                 }
                 
             } catch (error) {
                 if (error.response?.status === 404) {
-                    console.log(`   ⚠️ Run not found yet (attempt ${attempt}), job might still be starting...`);
+                    console.log(`   Run not found yet (attempt ${attempt}), job might still be starting...`);
                 } else if (error.response?.status === 401) {
-                    console.error('   ❌ Authentication failed, refreshing token...');
+                    console.error('   Authentication failed, refreshing token...');
                     // Refresh token for next attempt
                     accessToken = await getAccessToken();
                 } else {
-                    console.log(`   ⚠️ Polling error (attempt ${attempt}):`, error.response?.status, error.message);
+                    console.log(`   Polling error (attempt ${attempt}):`, error.response?.status, error.message);
                 }
                 
                 if (attempt < maxAttempts) {
@@ -649,7 +645,7 @@ async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 100
         throw new Error(`Job timeout - maximum attempts (${maxAttempts}) reached after ${(maxAttempts * intervalMs) / 60000} minutes`);
         
     } catch (error) {
-        console.error('\n❌ ERROR IN JOB POLLING:');
+        console.error('\nERROR IN JOB POLLING:');
         console.error('=' .repeat(50));
         console.error('Error message:', error.message);
         if (error.response) {
@@ -668,7 +664,7 @@ async function pollJobResults(jobRunResponse, maxAttempts = 30, intervalMs = 100
 
 async function downloadOptimizationResults() {
     try {
-        console.log('📥 Downloading optimization results from COS...');
+        console.log('Downloading optimization results from COS...');
         
         const results = {
             solutionSummary: [],
@@ -698,27 +694,27 @@ async function downloadOptimizationResults() {
             for (const prefix of outputPrefixes) {
                 try {
                     const fullPath = prefix + file.filename;
-                    console.log(`🔍 Trying to download: ${fullPath}`);
+                    console.log(`Trying to download: ${fullPath}`);
                     
                     const fileData = await downloadFromIBMCOS(fullPath);
                     results[file.key] = parseCSVContent(fileData);
-                    console.log(`✅ ${file.key} downloaded successfully from ${fullPath}`);
+                    console.log(`${file.key} downloaded successfully from ${fullPath}`);
                     found = true;
                     break;
                 } catch (error) {
-                    console.log(`⚠️ ${fullPath} not found, trying next location...`);
+                    console.log(`${fullPath} not found, trying next location...`);
                 }
             }
             
             if (!found) {
-                console.log(`⚠️ ${file.key} not found in any location, using default`);
+                console.log(`${file.key} not found in any location, using default`);
                 results[file.key] = [];
             }
         }
         
         // Si no encontramos resultados, generar datos de ejemplo
         if (results.solutionSummary.length === 0) {
-            console.log('📊 No solution results found, generating default summary...');
+            console.log('No solution results found, generating default summary...');
             results.solutionSummary = [{ 
                 Makespan: 0, 
                 TotalTasks: 0, 
@@ -727,8 +723,8 @@ async function downloadOptimizationResults() {
             }];
         }
         
-        console.log('✅ All optimization results processed');
-        console.log('📊 Results summary:', {
+        console.log('All optimization results processed');
+        console.log('Results summary:', {
             solutionSummary: results.solutionSummary.length,
             taskSchedule: results.taskSchedule.length,
             resourceUsage: results.resourceUsage.length,
@@ -740,7 +736,7 @@ async function downloadOptimizationResults() {
         return results;
         
     } catch (error) {
-        console.error('❌ Error downloading optimization results:', error);
+        console.error('Error downloading optimization results:', error);
         throw new Error('Failed to download optimization results: ' + error.message);
     }
 }
@@ -800,7 +796,7 @@ function parseCSVData(buffer) {
 
 // Serve the main HTML file
 app.get('/', (req, res) => {
-    console.log('🏠 Serving main page');
+    console.log('Serving main page');
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -832,14 +828,14 @@ app.get('/health', (req, res) => {
 // Nueva ruta para verificar permisos antes de ejecutar
 app.get('/verify-permissions', async (req, res) => {
     try {
-        console.log('🔍 Verifying space permissions...');
+        console.log('Verifying space permissions...');
         
         const accessToken = await getAccessToken();
-        console.log('✅ Access token obtained successfully');
+        console.log('Access token obtained successfully');
         
         try {
             await verifySpaceAccess(accessToken);
-            console.log('✅ Space access verified successfully');
+            console.log('Space access verified successfully');
             
             res.json({
                 success: true,
@@ -851,7 +847,7 @@ app.get('/verify-permissions', async (req, res) => {
             });
             
         } catch (permError) {
-            console.error('❌ Space access verification failed:', permError.message);
+            console.error('Space access verification failed:', permError.message);
             
             res.status(403).json({
                 success: false,
@@ -875,7 +871,7 @@ app.get('/verify-permissions', async (req, res) => {
         }
         
     } catch (tokenError) {
-        console.error('❌ Token verification failed:', tokenError.message);
+        console.error('Token verification failed:', tokenError.message);
         
         res.status(401).json({
             success: false,
@@ -890,19 +886,19 @@ app.get('/verify-permissions', async (req, res) => {
 
 // Upload CSV files to IBM COS - NOMBRES SIMPLIFICADOS
 app.post('/upload-csv', upload.single('file'), async (req, res) => {
-    console.log('📁 CSV Upload request received');
+    console.log('CSV Upload request received');
     
     try {
         if (!req.file) {
-            console.log('❌ No file in request');
+            console.log('No file in request');
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        console.log('📄 File received:', req.file.originalname, 'Size:', req.file.size);
+        console.log('File received:', req.file.originalname, 'Size:', req.file.size);
         
         // Parse CSV data
         const data = await parseCSVData(req.file.buffer);
-        console.log('✅ CSV parsed successfully, rows:', data.length);
+        console.log('CSV parsed successfully, rows:', data.length);
         
         // Map to correct filename format - NOMBRES LIMPIOS
         let fileName = req.file.originalname;
@@ -920,12 +916,12 @@ app.post('/upload-csv', upload.single('file'), async (req, res) => {
         }
         // Si no coincide con ningún patrón, mantener nombre original
         
-        console.log(`📝 Mapping ${req.file.originalname} → ${fileName}`);
+        console.log(`Mapping ${req.file.originalname} → ${fileName}`);
         
         // Upload file to IBM COS
         const uploadResult = await uploadToIBMCOS(fileName, req.file.buffer, 'text/csv');
         
-        console.log('✅ File uploaded to COS:', uploadResult.location);
+        console.log('File uploaded to COS:', uploadResult.location);
         
         res.json({ 
             success: true, 
@@ -938,7 +934,7 @@ app.post('/upload-csv', upload.single('file'), async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('❌ CSV upload/processing error:', error);
+        console.error('CSV upload/processing error:', error);
         res.status(500).json({ error: 'Failed to process CSV: ' + error.message });
     }
 });
@@ -954,12 +950,12 @@ app.post('/upload-manual-data', async (req, res) => {
             return res.status(400).json({ error: 'No data provided' });
         }
 
-        console.log('📊 Converting manual data to optimization CSV format...');
+        console.log('Converting manual data to optimization CSV format...');
         
         // Generate CSV files from manual data with clean naming
         const csvFiles = generateOptimizationCSVs(data);
         
-        console.log('📤 Uploading CSV files to IBM COS...');
+        console.log('Uploading CSV files to IBM COS...');
         
         const uploadResults = {};
         
@@ -978,9 +974,9 @@ app.post('/upload-manual-data', async (req, res) => {
                     filename: fileInfo.filename
                 };
                 
-                console.log(`✅ ${type} CSV uploaded to COS: ${uploadResult.location}`);
+                console.log(`${type} CSV uploaded to COS: ${uploadResult.location}`);
             } catch (error) {
-                console.error(`❌ Error uploading ${type} CSV:`, error);
+                console.error(`Error uploading ${type} CSV:`, error);
                 uploadResults[type] = {
                     success: false,
                     error: error.message
@@ -997,7 +993,7 @@ app.post('/upload-manual-data', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('❌ Manual data processing error:', error);
+        console.error('Manual data processing error:', error);
         res.status(500).json({ error: 'Failed to process manual data: ' + error.message });
     }
 });
@@ -1007,17 +1003,17 @@ app.post('/optimize', async (req, res) => {
     try {
         const { data, fromManual } = req.body;
         
-        console.log('🎯 Starting optimization with existing Watson ML Job...');
-        console.log('📊 Data source:', fromManual ? 'Manual Input' : 'CSV Files');
-        console.log('🆔 Job ID:', IBM_CONFIG.jobId);
-        console.log('🌐 Space ID:', IBM_CONFIG.spaceId);
+        console.log('Starting optimization with existing Watson ML Job...');
+        console.log('Data source:', fromManual ? 'Manual Input' : 'CSV Files');
+        console.log('Job ID:', IBM_CONFIG.jobId);
+        console.log('Space ID:', IBM_CONFIG.spaceId);
         
         // Validar datos requeridos
         if (!data || !data.tasks || !data.resources || !data.demands) {
             return res.status(400).json({ error: 'Missing required optimization data' });
         }
 
-        console.log('📋 Data summary:');
+        console.log('Data summary:');
         console.log('  - Tasks:', data.tasks.length);
         console.log('  - Resources:', data.resources.length); 
         console.log('  - Demands:', data.demands.length);
@@ -1025,7 +1021,7 @@ app.post('/optimize', async (req, res) => {
 
         // Si es entrada manual, subir archivos a COS primero
         if (fromManual) {
-            console.log('📤 Uploading manual data to COS...');
+            console.log('Uploading manual data to COS...');
             const csvFiles = generateOptimizationCSVs(data);
             
             for (const [type, fileInfo] of Object.entries(csvFiles)) {
@@ -1035,7 +1031,7 @@ app.post('/optimize', async (req, res) => {
         }
 
         // Ejecutar job existente con manejo mejorado de permisos y fallbacks
-        console.log('🚀 Executing optimization job with fallback methods...');
+        console.log('Executing optimization job with fallback methods...');
         
         let jobRunResult;
         try {
@@ -1066,18 +1062,18 @@ app.post('/optimize', async (req, res) => {
             throw error;
         }
         
-        console.log('✅ Job run started successfully');
-        console.log('📋 Job details:', {
+        console.log('Job run started successfully');
+        console.log('Job details:', {
             id: jobRunResult.metadata?.id || jobRunResult.id,
             state: jobRunResult.entity?.status?.state || jobRunResult.state,
             href: jobRunResult.metadata?.href || jobRunResult.href
         });
 
         // Hacer polling de resultados del run usando la respuesta completa
-        console.log('⏳ Waiting for job run completion...');
+        console.log('Waiting for job run completion...');
         const results = await pollJobResults(jobRunResult);
         
-        console.log('✅ Optimization completed successfully');
+        console.log('Optimization completed successfully');
 
         res.json({ 
             success: true, 
@@ -1093,12 +1089,12 @@ app.post('/optimize', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('❌ Optimization error:', error);
+        console.error('Optimization error:', error);
         
         // Logging más detallado para debugging
         if (error.response) {
-            console.error('📊 Error response status:', error.response.status);
-            console.error('📊 Error response data:', JSON.stringify(error.response.data, null, 2));
+            console.error('Error response status:', error.response.status);
+            console.error('Error response data:', JSON.stringify(error.response.data, null, 2));
         }
         
         // Manejo específico de errores comunes
@@ -1138,7 +1134,7 @@ app.post('/optimize', async (req, res) => {
 // List files in COS
 app.get('/cos-files', async (req, res) => {
     try {
-        console.log('📋 Listing files in IBM COS...');
+        console.log('Listing files in IBM COS...');
         const files = await listCOSFiles();
         
         const fileList = files.map(file => ({
@@ -1154,7 +1150,7 @@ app.get('/cos-files', async (req, res) => {
             count: fileList.length
         });
     } catch (error) {
-        console.error('❌ Error listing COS files:', error);
+        console.error('Error listing COS files:', error);
         res.status(500).json({ error: 'Failed to list COS files: ' + error.message });
     }
 });
@@ -1163,7 +1159,7 @@ app.get('/cos-files', async (req, res) => {
 app.get('/download-cos-file/:fileName', async (req, res) => {
     try {
         const { fileName } = req.params;
-        console.log(`📥 Downloading ${fileName} from COS...`);
+        console.log(`Downloading ${fileName} from COS...`);
         
         const fileContent = await downloadFromIBMCOS(fileName);
         
@@ -1174,7 +1170,7 @@ app.get('/download-cos-file/:fileName', async (req, res) => {
         
         res.send(fileContent);
     } catch (error) {
-        console.error('❌ Error downloading file from COS:', error);
+        console.error('Error downloading file from COS:', error);
         res.status(500).json({ error: 'Failed to download file: ' + error.message });
     }
 });
@@ -1184,7 +1180,7 @@ app.post('/optimize-demo', async (req, res) => {
     try {
         const { data } = req.body;
         
-        console.log('🎮 Using demo mode - simulating Watson ML optimization...');
+        console.log('Using demo mode - simulating Watson ML optimization...');
         
         // Simulate processing delay
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -1227,7 +1223,7 @@ app.post('/optimize-demo', async (req, res) => {
             resourceTimeline: []
         };
         
-        console.log('✅ Demo results generated successfully');
+        console.log('Demo results generated successfully');
         res.json({ success: true, results: mockResults });
     } catch (error) {
         console.error('❌ Demo error:', error);
@@ -1237,7 +1233,7 @@ app.post('/optimize-demo', async (req, res) => {
 
 // Get sample data
 app.get('/sample-data', (req, res) => {
-    console.log('📊 Sending sample data');
+    console.log('Sending sample data');
     
     const sampleData = {
         parameters: [
@@ -1282,7 +1278,7 @@ app.get('/sample-data', (req, res) => {
 // =============================================================================
 
 app.use((error, req, res, next) => {
-    console.error('💥 Unhandled error:', error);
+    console.error('Unhandled error:', error);
     res.status(500).json({ 
         error: 'Internal server error', 
         message: error.message,
@@ -1295,40 +1291,38 @@ app.use((error, req, res, next) => {
 // =============================================================================
 
 app.listen(PORT, () => {
-    console.log('\n' + '🚀'.repeat(20));
-    console.log(`🌟 IBM WATSON ML JOB EXECUTOR + COS SERVER - FIXED VERSION`);
-    console.log(`🔗 URL: http://localhost:${PORT}`);
-    console.log(`📁 Directory: ${__dirname}`);
-    console.log(`🆔 Job ID: ${IBM_CONFIG.jobId}`);
-    console.log(`🌐 Space ID: ${IBM_CONFIG.spaceId}`);
-    console.log(`👥 Group ID: ${IBM_CONFIG.groupId}`);
-    console.log(`🚀 Job Run Endpoint: ${IBM_CONFIG.jobRunEndpoint}`);
-    console.log(`🗄️  COS Bucket: ${COS_CONFIG.bucketName}`);
-    console.log(`🔑 API Key: ${IBM_CONFIG.apiKey.substring(0, 10)}...`);
-    console.log(`📦 Version: 5.0.0 - Enhanced with Permission Management`);
-    console.log('🚀'.repeat(20) + '\n');
+    console.log(`URL: http://localhost:${PORT}`);
+    console.log(`Directory: ${__dirname}`);
+    console.log(`Job ID: ${IBM_CONFIG.jobId}`);
+    console.log(`Space ID: ${IBM_CONFIG.spaceId}`);
+    console.log(`Group ID: ${IBM_CONFIG.groupId}`);
+    console.log(`Job Run Endpoint: ${IBM_CONFIG.jobRunEndpoint}`);
+    console.log(`COS Bucket: ${COS_CONFIG.bucketName}`);
+    console.log(`API Key: ${IBM_CONFIG.apiKey.substring(0, 10)}...`);
+
+
     
-    console.log('🔧 NEW FEATURES IN THIS VERSION:');
-    console.log('   ✅ Permission verification before job execution');
-    console.log('   ✅ Fallback execution methods');
-    console.log('   ✅ Enhanced error handling for 403 errors');
-    console.log('   ✅ ServiceId extraction from error messages');
-    console.log('   ✅ Detailed troubleshooting information');
-    console.log('   ✅ New endpoint: GET /verify-permissions');
+    console.log('NEW FEATURES IN THIS VERSION:');
+    console.log('   Permission verification before job execution');
+    console.log('   Fallback execution methods');
+    console.log('   Enhanced error handling for 403 errors');
+    console.log('   ServiceId extraction from error messages');
+    console.log('   Detailed troubleshooting information');
+    console.log('   New endpoint: GET /verify-permissions');
     console.log('');
     
-    console.log('🧪 TESTING ENDPOINTS:');
-    console.log('   🔍 GET  /verify-permissions  - Check if ServiceId has proper access');
-    console.log('   🏥 GET  /health             - Server status and configuration');
-    console.log('   📋 GET  /cos-files          - List files in COS bucket');
-    console.log('   🎯 POST /optimize           - Execute optimization (main endpoint)');
-    console.log('   🎮 POST /optimize-demo      - Demo mode with mock results');
+    console.log('TESTING ENDPOINTS:');
+    console.log('   GET  /verify-permissions  - Check if ServiceId has proper access');
+    console.log('   GET  /health             - Server status and configuration');
+    console.log('   GET  /cos-files          - List files in COS bucket');
+    console.log('   POST /optimize           - Execute optimization (main endpoint)');
+    console.log('   POST /optimize-demo      - Demo mode with mock results');
     console.log('');
     
     // Test COS connection
-    console.log('🧪 Testing COS connection...');
+    console.log('Testing COS connection...');
     listCOSFiles().then(files => {
-        console.log(`✅ COS connected successfully. Found ${files.length} files.`);
+        console.log(`COS connected successfully. Found ${files.length} files.`);
         files.slice(0, 5).forEach(file => {
             console.log(`📄 ${file.Key} (${file.Size} bytes)`);
         });
@@ -1336,26 +1330,25 @@ app.listen(PORT, () => {
             console.log(`   ... and ${files.length - 5} more files`);
         }
     }).catch(error => {
-        console.log(`❌ COS connection failed: ${error.message}`);
-        console.log(`⚠️  You may need to create the bucket: ${COS_CONFIG.bucketName}`);
+        console.log(`COS connection failed: ${error.message}`);
+        console.log(` You may need to create the bucket: ${COS_CONFIG.bucketName}`);
     });
     
     // Test IAM token
-    console.log('🧪 Testing IAM token...');
+    console.log('Testing IAM token...');
     getAccessToken().then(token => {
-        console.log(`✅ IAM token obtained successfully: ${token.substring(0, 20)}...`);
+        console.log(`IAM token obtained successfully: ${token.substring(0, 20)}...`);
         
         // Test space access
-        console.log('🧪 Testing space access...');
+        console.log('Testing space access...');
         verifySpaceAccess(token).then(hasAccess => {
             console.log(`✅ Space access verified: ${hasAccess}`);
         }).catch(error => {
-            console.log(`❌ Space access failed: ${error.message}`);
-            console.log(`🔧 SOLUTION: Use GET /verify-permissions for detailed instructions`);
+            console.log(`Space access failed: ${error.message}`);
         });
         
     }).catch(error => {
-        console.log(`❌ IAM token failed: ${error.message}`);
+        console.log(`IAM token failed: ${error.message}`);
     });
 });
 
