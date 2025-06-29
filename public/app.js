@@ -1604,10 +1604,13 @@ class TaskOptimizer {
         this.clearManualInputs();
 
         // Clear data and COS info
-        Object.keys(this.data).forEach(key => {
-            this.data[key] = null;
+        Object.assign(this.data, {
+            parameters: [],
+            tasks: [],
+            resources: [],
+            demands: [],
+            precedences: []
         });
-        this.cosUploadInfo = {};
 
         // Clear validation errors
         this.clearValidationErrors();
@@ -1651,6 +1654,43 @@ class TaskOptimizer {
             if (chart) chart.destroy();
         });
         this.charts = {};
+
+        // Restore demo button if it was replaced
+        const demoBtn = document.getElementById('demoBtn');
+        if (demoBtn) {
+            // Create the original sampleDataBtn
+            const sampleBtn = document.createElement('button');
+            sampleBtn.id = 'sampleDataBtn';
+            sampleBtn.className = 'btn btn-secondary';
+            sampleBtn.innerHTML = '<i class="fas fa-database"></i> Cargar Datos de Ejemplo';
+            sampleBtn.disabled = false;
+            
+            // Agregar el event listener CORRECTO para cargar datos de ejemplo
+            sampleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // PRIMERO: Cargar los datos de ejemplo
+                this.loadSampleData(); // Asegúrate de que este método existe y carga los datos
+                
+                // SEGUNDO: Crear y mostrar el botón de optimizar demo
+                const newDemoBtn = document.createElement('button');
+                newDemoBtn.id = 'demoBtn';
+                newDemoBtn.className = 'btn btn-primary';
+                newDemoBtn.innerHTML = '<i class="fas fa-rocket"></i> Optimizar Demo';
+                newDemoBtn.disabled = false;
+                newDemoBtn.addEventListener('click', () => window.taskOptimizer.optimizeDemo());
+
+                // TERCERO: Reemplazar el botón
+                sampleBtn.parentNode.replaceChild(newDemoBtn, sampleBtn);
+                
+                // NO llamar optimizeDemo() aquí - eso debe hacerlo el usuario al hacer click en "Optimizar Demo"
+            });
+            
+            demoBtn.parentNode.replaceChild(sampleBtn, demoBtn);
+        }
+
+        // Re-check if optimization is ready (reenable buttons if CSV files are present)
+        this.checkOptimizationReady();
 
         this.showSuccess('Datos y archivos limpiados correctamente');
     }
@@ -1751,29 +1791,55 @@ function downloadCOSFile(fileName) {
 
 document.addEventListener('DOMContentLoaded', () => {
     window.taskOptimizer = new TaskOptimizer();
-    
-    // Add demo button functionality
-    const addDemoButton = () => {
-        const actionButtons = document.querySelector('.action-buttons');
-        if (actionButtons && !document.getElementById('demoBtn')) {
-            const demoBtn = document.createElement('button');
-            demoBtn.id = 'demoBtn';
-            demoBtn.className = 'btn btn-secondary';
-            demoBtn.innerHTML = '<i class="fas fa-play"></i> Demo';
-            demoBtn.addEventListener('click', () => window.taskOptimizer.optimizeDemo());
-            
-            // Insert before the optimize button
-            const optimizeBtn = document.getElementById('optimizeBtn');
-            if (optimizeBtn) {
-                actionButtons.insertBefore(demoBtn, optimizeBtn);
-            } else {
-                actionButtons.appendChild(demoBtn);
-            }
+
+    // Helper function to disable optimize button
+    const disableOptimizeBtn = () => {
+        const optimizeBtn = document.getElementById('optimizeBtn');
+        if (optimizeBtn) {
+            optimizeBtn.disabled = true;
         }
     };
-    
-    // Add demo button after a short delay to ensure DOM is ready
-    setTimeout(addDemoButton, 100);
-    
+
+    // Cuando se hace click en sampleDataBtn, reemplaza el botón por demoBtn y ejecuta optimizeDemo
+    const sampleBtn = document.getElementById('sampleDataBtn');
+    if (sampleBtn) {
+        sampleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            // Crear demoBtn
+            const demoBtn = document.createElement('button');
+            demoBtn.id = 'demoBtn';
+            demoBtn.className = 'btn btn-primary';
+            demoBtn.innerHTML = '<i class="fas fa-rocket"></i> Optimizar Demo';
+            demoBtn.disabled = false;
+            demoBtn.addEventListener('click', () => {
+                // Deshabilitar el botón de Optimizar CSV Seleccionados
+                disableOptimizeBtn();
+                
+                // Ejecutar la demo
+                window.taskOptimizer.optimizeDemo();
+                
+                // Asegurarse de que el botón sigue deshabilitado después de la demo
+                setTimeout(() => {
+                    disableOptimizeBtn();
+                }, 100);
+            });
+
+            // Reemplazar sampleBtn por demoBtn
+            sampleBtn.parentNode.replaceChild(demoBtn, sampleBtn);
+
+            // Deshabilitar el botón de Optimizar CSV Seleccionados al cargar demo
+            disableOptimizeBtn();
+
+            // Ejecutar la demo inicialmente
+            window.taskOptimizer.optimizeDemo();
+            
+            // Asegurarse de que el botón sigue deshabilitado después de la primera ejecución
+            setTimeout(() => {
+                disableOptimizeBtn();
+            }, 100);
+        });
+    }
+
     console.log('🚀 Task Optimizer initialized successfully');
 });
