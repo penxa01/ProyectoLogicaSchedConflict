@@ -1402,9 +1402,9 @@ class TaskOptimizer {
     // Utiliza la misma lógica que las tareas, pero con datos de recursos
     createResourceChart(resourceData) {
         console.log('📈 Creating resource chart with data:', resourceData);
-        
+
         const ctx = document.getElementById('resourceChart').getContext('2d');
-        
+
         if (this.charts.resource) {
             this.charts.resource.destroy();
         }
@@ -1417,7 +1417,7 @@ class TaskOptimizer {
                 key.toLowerCase(),      // resourceid
                 key.charAt(0).toLowerCase() + key.slice(1)  // resourceID
             ];
-            
+
             for (const variation of variations) {
                 if (resource[variation] !== undefined && resource[variation] !== null) {
                     let value = resource[variation];
@@ -1447,17 +1447,33 @@ class TaskOptimizer {
             return val;
         };
 
-        const labels = resourceData.map((r, index) => {
-            const resourceId = getResourceValue(r, 'ResourceID') || (index + 1);
-            return `Recurso ${formatNumber(resourceId)}`;
+        // Agrupar por resourceId único
+        const resourceMap = new Map();
+        resourceData.forEach(r => {
+            const resourceId = getResourceValue(r, 'ResourceID') ?? getResourceValue(r, 'IDresource');
+            if (resourceId !== null && !resourceMap.has(resourceId)) {
+                resourceMap.set(resourceId, r);
+            }
         });
-        
-        const capacityData = resourceData.map(r => {
-            return formatNumber(getResourceValue(r, 'Capacity') || 0);
+
+        // Ordenar por resourceId numérico ascendente
+        const sortedResourceIds = Array.from(resourceMap.keys()).sort((a, b) => Number(a) - Number(b));
+        const uniqueResources = sortedResourceIds.map(id => resourceMap.get(id));
+
+        const labels = sortedResourceIds.map(id => `Recurso ${formatNumber(id)}`);
+
+        const capacityData = uniqueResources.map(r => {
+            return formatNumber(getResourceValue(r, 'Capacity') ?? getResourceValue(r, 'capacity') ?? 0);
         });
-        
-        const usageData = resourceData.map(r => {
-            return formatNumber(getResourceValue(r, 'MaxUsage') || getResourceValue(r, 'Usage') || 0);
+
+        const usageData = uniqueResources.map(r => {
+            return formatNumber(
+                getResourceValue(r, 'MaxUsage') ??
+                getResourceValue(r, 'Usage') ??
+                getResourceValue(r, 'maxUsage') ??
+                getResourceValue(r, 'usage') ??
+                0
+            );
         });
 
         console.log('📊 Chart data prepared:', { labels, capacityData, usageData });
@@ -1502,7 +1518,7 @@ class TaskOptimizer {
                 }
             }
         });
-        
+
         console.log('✅ Resource chart created successfully');
     }
 
