@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 3000;
 // =============================================================================
 // IBM Cloud Object Storage Configuration
 // =============================================================================
-
+//Subir COS_CONFIG e IBM_CONFIG a .env y eliminar del codigo
 const COS_CONFIG = {
     endpoint: 'https://s3.us-south.cloud-object-storage.appdomain.cloud',
     apiKeyId: 'C3g5p6YQe8rCH9xztTduzstOPz1CVT64fox7Gi5j7xLi',
