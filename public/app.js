@@ -532,7 +532,7 @@ class TaskOptimizer {
                     console.log('✅ Manual data validated and updated');
                 }
             }
-
+            
             // Validar datos requeridos finales
             if (!this.data.tasks || this.data.tasks.length === 0) {
                 throw new Error('No hay datos de tareas cargados');
@@ -1005,11 +1005,6 @@ class TaskOptimizer {
             tbody.appendChild(tr);
         });
     }
-
-    // =========================================================================
-    // SAMPLE DATA (with COS upload)
-    // =========================================================================
-
     async loadSampleData() {
         try {
             const response = await fetch('/sample-data');
@@ -1019,9 +1014,21 @@ class TaskOptimizer {
             }
 
             const sampleData = await response.json();
+            console.log('📦 Sample data received:', sampleData);
             
             // Load sample data into the application
             this.data = sampleData;
+            
+            // IMPORTANTE: También actualizar csvFiles para que la optimización use estos datos
+            this.csvFiles = {
+                parameters: sampleData.parameters,
+                tasks: sampleData.tasks,
+                resources: sampleData.resources,
+                demands: sampleData.demands,
+                precedences: sampleData.precedences
+            };
+            
+            console.log('✅ Sample data loaded into both this.data and this.csvFiles');
             
             // Check current input mode and populate accordingly
             const currentMode = this.getCurrentInputMode();
@@ -1043,6 +1050,7 @@ class TaskOptimizer {
             this.checkOptimizationReady();
             
         } catch (error) {
+            console.error('❌ Error loading sample data:', error);
             this.showError('Error cargando datos de ejemplo: ' + error.message);
         }
     }
@@ -1054,6 +1062,14 @@ class TaskOptimizer {
     displayResults(results) {
         try {
             console.log('📊 Displaying results:', results);
+            
+            // DEBUGGING: Verificar qué está llegando
+            console.log('🔍 results.solutionSummary:', results.solutionSummary);
+            console.log('🔍 Type of solutionSummary:', typeof results.solutionSummary);
+            console.log('🔍 Is array?', Array.isArray(results.solutionSummary));
+            if (results.solutionSummary && results.solutionSummary.length > 0) {
+                console.log('🔍 First element:', results.solutionSummary[0]);
+            }
             
             this.updateSolutionSummary(results.solutionSummary);
             this.createScheduleTable(results.taskSchedule);
@@ -1075,88 +1091,376 @@ class TaskOptimizer {
     }
 
     updateSolutionSummary(solutionData) {
-        if (solutionData && solutionData.length > 0) {
+        console.log('📋 Updating solution summary:', solutionData);
+
+        // Helper to clean value (removes quotes if present)
+        const cleanValue = (val) => {
+            if (typeof val === 'string') {
+                val = val.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+                // Try to convert to number if possible
+                const num = Number(val);
+                if (!isNaN(num)) return num;
+                return val;
+            }
+            return val;
+        };
+
+        // Helper to format numbers: remove .0 for integers
+        const formatNumber = (val) => {
+            if (typeof val === 'number' && Number.isFinite(val)) {
+                return Number.isInteger(val) ? val : val;
+            }
+            return val;
+        };
+
+        if (Array.isArray(solutionData) && solutionData.length > 0) {
             const solution = solutionData[0];
-            document.getElementById('makespanValue').textContent = solution.Makespan || '--';
-            document.getElementById('totalTasksValue').textContent = solution.TotalTasks || '--';
-            document.getElementById('totalResourcesValue').textContent = solution.TotalResources || '--';
-            document.getElementById('statusValue').textContent = solution.Status || '--';
+            console.log('📋 Solution object:', solution);
+            console.log('📋 Solution keys:', Object.keys(solution));
+
+            // Las keys tienen comillas, así que las accedemos con comillas
+            let makespan = cleanValue(solution['"Makespan"'] || solution['Makespan'] || solution.makespan || '--');
+            let totalTasks = cleanValue(solution['"TotalTasks"'] || solution['TotalTasks'] || solution.totalTasks || '--');
+            let totalResources = cleanValue(solution['"TotalResources"'] || solution['TotalResources'] || solution.totalResources || '--');
+            let status = cleanValue(solution['"Status"'] || solution['Status'] || solution.status || '--');
+
+            // Formatear números: sacar .0 si es entero
+            makespan = formatNumber(makespan);
+            totalTasks = formatNumber(totalTasks);
+            totalResources = formatNumber(totalResources);
+
+            console.log('📋 Values extracted:', { makespan, totalTasks, totalResources, status });
+
+            // Actualizar DOM
+            document.getElementById('makespanValue').textContent = makespan;
+            document.getElementById('totalTasksValue').textContent = totalTasks;
+            document.getElementById('totalResourcesValue').textContent = totalResources;
+            document.getElementById('statusValue').textContent = status;
+
+            console.log('✅ All values updated successfully!');
+
+        } else {
+            console.warn('⚠️ solutionData is not a valid array or is empty:', solutionData);
+            document.getElementById('makespanValue').textContent = '--';
+            document.getElementById('totalTasksValue').textContent = '--';
+            document.getElementById('totalResourcesValue').textContent = '--';
+            document.getElementById('statusValue').textContent = '--';
         }
     }
 
+    // Tabla de programacion detallada
     createScheduleTable(scheduleData) {
+        console.log('📅 Creating schedule table with data:', scheduleData);
+        
         const tbody = document.querySelector('#scheduleTable tbody');
+        if (!tbody) {
+            console.error('❌ Table tbody not found');
+            return;
+        }
+        
         tbody.innerHTML = '';
 
-        scheduleData.forEach(task => {
+        if (!Array.isArray(scheduleData) || scheduleData.length === 0) {
+            console.warn('⚠️ No schedule data available');
+            return;
+        }
+
+        // Helper to format numbers: remove .0 for integers
+        const formatNumber = (val) => {
+            if (typeof val === 'string' && val.trim() !== '') {
+                const num = Number(val);
+                if (!isNaN(num)) val = num;
+            }
+            if (typeof val === 'number' && Number.isFinite(val)) {
+                return Number.isInteger(val) ? val : val;
+            }
+            return val;
+        };
+
+        scheduleData.forEach((task, index) => {
+            // Helper function to get task value with different key variations
+            const getTaskValue = (key) => {
+                const variations = [
+                    key,                    // TaskID
+                    `"${key}"`,            // "TaskID"
+                    key.toLowerCase(),      // taskid
+                    key.charAt(0).toLowerCase() + key.slice(1)  // taskID
+                ];
+                
+                for (const variation of variations) {
+                    if (task[variation] !== undefined && task[variation] !== null) {
+                        let value = task[variation];
+                        // Clean quotes if it's a string
+                        if (typeof value === 'string') {
+                            value = value.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+                        }
+                        return value;
+                    }
+                }
+                return null;
+            };
+
+            // Extract values using the helper function
+            let taskId = getTaskValue('TaskID') || (index + 1);
+            let startTime = getTaskValue('StartTime') || 0;
+            let endTime = getTaskValue('EndTime') || 0;
+            let duration = getTaskValue('Duration') || 1;
+
+            // Format numbers: remove .0 for integers
+            taskId = formatNumber(taskId);
+            startTime = formatNumber(startTime);
+            endTime = formatNumber(endTime);
+            duration = formatNumber(duration);
+
+            // If float but integer, show as integer (remove .0)
+            const display = (val) => (typeof val === 'number' && Number.isInteger(val)) ? val : val;
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>Tarea ${task.TaskID}</td>
-                <td>${task.StartTime}</td>
-                <td>${task.EndTime}</td>
-                <td>${task.Duration}</td>
+                <td>Tarea ${display(taskId)}</td>
+                <td>${display(startTime)}</td>
+                <td>${display(endTime)}</td>
+                <td>${display(duration)}</td>
+                <td>
+                    <div style="background: #e5e7eb; height: 18px; position: relative; width: 100%; min-width: 120px;">
+                        <div style="
+                            position: absolute;
+                            left: ${(startTime || 0) * 3}px;
+                            width: ${(duration || 1) * 3}px;
+                            height: 100%;
+                            background: ${this.getTaskColor(taskId)};
+                            border-radius: 4px;
+                            ">
+                        </div>
+                    </div>
+                </td>
             `;
             tbody.appendChild(tr);
         });
+        
+        console.log('✅ Schedule table created successfully');
     }
 
+    // Diagrama de Gantt
     createGanttChart(scheduleData) {
+        console.log('📊 Creating REAL Gantt chart with data:', scheduleData);
+
         const ctx = document.getElementById('ganttChart').getContext('2d');
-        
+
         if (this.charts.gantt) {
             this.charts.gantt.destroy();
         }
 
+        // Helper function to get task value
+        const getTaskValue = (task, key) => {
+            const variations = [key, `"${key}"`, key.toLowerCase(), key.charAt(0).toLowerCase() + key.slice(1)];
+            for (const variation of variations) {
+                if (task[variation] !== undefined && task[variation] !== null) {
+                    let value = task[variation];
+                    if (typeof value === 'string') {
+                        value = value.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+                        // Convert to number if possible
+                        const num = parseFloat(value);
+                        return !isNaN(num) ? num : value;
+                    }
+                    return value;
+                }
+            }
+            return null;
+        };
+
+        // Process data for Gantt chart
+        const ganttData = scheduleData.map((task, index) => {
+            const taskId = getTaskValue(task, 'TaskID') || (index + 1);
+            const startTime = getTaskValue(task, 'StartTime') || 0;
+            const endTime = getTaskValue(task, 'EndTime');
+            const duration = getTaskValue(task, 'Duration') || 1;
+            const calculatedEndTime = endTime || (startTime + duration);
+            return {
+                taskId: taskId,
+                taskName: `${taskId}`,
+                startTime: startTime,
+                endTime: calculatedEndTime,
+                duration: calculatedEndTime - startTime
+            };
+        });
+
+        console.log('📊 Processed Gantt data:', ganttData);
+
+        // Create labels with only task IDs for y-axis (one per row)
+        const labels = ganttData.map(item => item.taskName);
+
+        // Create datasets - each task gets two bars: invisible spacer + visible task bar
+        const datasets = [
+            {
+                label: 'Inicio (invisible)',
+                data: ganttData.map(item => item.startTime),
+                backgroundColor: 'rgba(0,0,0,0)', // Transparent
+                borderColor: 'rgba(0,0,0,0)',     // Transparent
+                borderWidth: 0,
+                barPercentage: 0.8,
+                categoryPercentage: 0.9,
+            },
+            {
+                label: 'Duración',
+                data: ganttData.map(item => item.duration),
+                backgroundColor: ganttData.map((item, index) => this.getTaskColor(item.taskId)),
+                borderColor: ganttData.map((item, index) => this.getTaskColorDark(item.taskId)),
+                borderWidth: 1,
+                barPercentage: 0.8,
+                categoryPercentage: 0.9,
+            }
+        ];
+
         this.charts.gantt = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: scheduleData.map(task => `Tarea ${task.TaskID}`),
-                datasets: [{
-                    label: 'Duración',
-                    data: scheduleData.map(task => ({
-                        x: task.StartTime,
-                        y: `Tarea ${task.TaskID}`,
-                        width: task.Duration
-                    })),
-                    backgroundColor: scheduleData.map((_, index) => this.getTaskColor(index)),
-                    borderColor: scheduleData.map((_, index) => this.getTaskColor(index)),
-                    borderWidth: 1
-                }]
+                labels: labels,
+                datasets: datasets
             },
             options: {
-                indexAxis: 'y',
+                indexAxis: 'y', // Horizontal bars
                 responsive: true,
                 plugins: {
                     title: {
                         display: true,
-                        text: 'Diagrama de Gantt - Programación de Tareas'
+                        text: 'Diagrama de Gantt - Programación de Tareas',
+                        font: { size: 16 }
                     },
                     legend: {
-                        display: false
+                        display: false // Hide legend since we have invisible bars
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                const index = context[0].dataIndex;
+                                return `Tarea ${ganttData[index].taskName}`;
+                            },
+                            label: function(context) {
+                                const index = context.dataIndex;
+                                const task = ganttData[index];
+                                if (context.datasetIndex === 1) { // Only show tooltip for visible bars
+                                    return [
+                                        `Inicio: ${task.startTime}`,
+                                        `Fin: ${task.endTime}`,
+                                        `Duración: ${task.duration}`
+                                    ];
+                                }
+                                return '';
+                            }
+                        }
                     }
                 },
                 scales: {
                     x: {
+                        stacked: true,
                         title: {
                             display: true,
                             text: 'Tiempo'
+                        },
+                        beginAtZero: true
+                    },
+                    y: {
+                        stacked: true,
+                        title: {
+                            display: true,
+                            text: 'Tareas'
+                        },
+                        ticks: {
+                            display: false // Hide y-axis labels (task IDs/numbers)
+                        },
+                        grid: {
+                            display: false // Optionally hide grid lines
                         }
                     }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
                 }
             }
         });
+
+        console.log('✅ Real Gantt chart created successfully');
     }
 
+    // Helper method for darker colors
+    getTaskColorDark(taskId) {
+        const darkColors = [
+            '#1E40AF', '#B91C1C', '#047857', '#B45309', '#6D28D9',
+            '#BE185D', '#0E7490', '#4D7C0F', '#C2410C', '#3730A3'
+        ];
+        
+        const index = typeof taskId === 'string' ? 
+            taskId.replace(/\D/g, '') % darkColors.length : 
+            taskId % darkColors.length;
+        
+        return darkColors[index] || darkColors[0];
+    }
+
+    //tabla de recursos
+    // Utiliza la misma lógica que las tareas, pero con datos de recursos
     createResourceChart(resourceData) {
+        console.log('📈 Creating resource chart with data:', resourceData);
+        
         const ctx = document.getElementById('resourceChart').getContext('2d');
         
         if (this.charts.resource) {
             this.charts.resource.destroy();
         }
 
-        const labels = resourceData.map(r => `Recurso ${r.ResourceID}`);
-        const capacityData = resourceData.map(r => r.Capacity);
-        const usageData = resourceData.map(r => r.MaxUsage);
+        // Helper function to get resource value (same logic as tasks)
+        const getResourceValue = (resource, key) => {
+            const variations = [
+                key,                    // ResourceID
+                `"${key}"`,            // "ResourceID"
+                key.toLowerCase(),      // resourceid
+                key.charAt(0).toLowerCase() + key.slice(1)  // resourceID
+            ];
+            
+            for (const variation of variations) {
+                if (resource[variation] !== undefined && resource[variation] !== null) {
+                    let value = resource[variation];
+                    // Clean quotes if it's a string
+                    if (typeof value === 'string') {
+                        value = value.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+                    }
+                    // Remove .0 for integers
+                    if (!isNaN(value) && Number(value) % 1 === 0) {
+                        value = Number(value);
+                    }
+                    return value;
+                }
+            }
+            return null;
+        };
+
+        // Helper to format numbers: remove .0 for integers
+        const formatNumber = (val) => {
+            if (typeof val === 'string' && val.trim() !== '') {
+                const num = Number(val);
+                if (!isNaN(num)) val = num;
+            }
+            if (typeof val === 'number' && Number.isFinite(val)) {
+                return Number.isInteger(val) ? val : val;
+            }
+            return val;
+        };
+
+        const labels = resourceData.map((r, index) => {
+            const resourceId = getResourceValue(r, 'ResourceID') || (index + 1);
+            return `Recurso ${formatNumber(resourceId)}`;
+        });
+        
+        const capacityData = resourceData.map(r => {
+            return formatNumber(getResourceValue(r, 'Capacity') || 0);
+        });
+        
+        const usageData = resourceData.map(r => {
+            return formatNumber(getResourceValue(r, 'MaxUsage') || getResourceValue(r, 'Usage') || 0);
+        });
+
+        console.log('📊 Chart data prepared:', { labels, capacityData, usageData });
 
         this.charts.resource = new Chart(ctx, {
             type: 'bar',
@@ -1198,6 +1502,8 @@ class TaskOptimizer {
                 }
             }
         });
+        
+        console.log('✅ Resource chart created successfully');
     }
 
     // =========================================================================
